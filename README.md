@@ -170,8 +170,3 @@ pip install "huggingface-hub<1.0"
 Placeholder (pendiente de definir).
 
 ```
-
----
-
-Si quieres, en el siguiente paso te dejo **el contenido recomendado de cada script** (`evaluate.py`, `quantize_onnx_int8_dynamic.py`, `showcase.py`) con rutas ya alineadas a tu repo (`datasource/` y `models/`).
-```
