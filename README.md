@@ -12,7 +12,7 @@ Incluye:
 
 ## 📁 Estructura del repositorio
 
-
+```
 CODE2_AI/
 ├─ datasource/
 │  ├─ train.json
@@ -33,6 +33,7 @@ CODE2_AI/
 │
 ├─ README.md
 └─ requirements.txt
+```
 
 ---
 
