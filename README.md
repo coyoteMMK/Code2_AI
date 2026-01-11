@@ -1,90 +1,149 @@
-# CODE-2 Translator (T5) — NL → Ensamblado CODE-2
+# CODE2_AI — Traductor NL → CODE-2 (T5 fine-tuning + ONNX INT8)
 
-Este repositorio contiene un sistema completo para **traducir instrucciones en lenguaje natural** a **ensamblado CODE-2** mediante un modelo **T5 (Seq2Seq)** entrenado con un **dataset sintético** generado automáticamente.
+Este repositorio contiene el pipeline completo para entrenar y evaluar un modelo tipo T5 que traduce **lenguaje natural (NL)** a **ensamblador CODE-2**.
 
 Incluye:
-- Generación de dataset (NL → CODE-2) en JSON
-- Entrenamiento (Full fine-tuning)
-- Evaluación con métricas (Exact Match, BLEU, ROUGE-L y tiempo de inferencia)
-- Cuantización (PTQ dinámico INT8 en PyTorch y ONNX INT8 dinámico)
-- Despliegue local (CLI y Gradio)
-- Despliegue en Hugging Face Spaces (Gradio)
-
----
-
-## ✨ Características principales
-
-- Traducción de múltiples líneas: la entrada puede contener varias instrucciones separadas por saltos de línea.
-- Manejo de errores: el generador incorpora ejemplos con registros/direcciones inválidas para mejorar robustez.
-- Normalización de salida: elimina tokens especiales, espacios sobrantes y preserva los saltos de línea reales.
-- Optimización para inferencia: opción ONNX INT8 dinámico con mejoras reales de tiempo en CPU.
+- Entrenamiento **Full Fine-Tuning** (PyTorch FP32)
+- Exportación y cuantización **ONNX INT8 dinámico**
+- Evaluación con métricas (Exact Match, BLEU, ROUGE-L, tiempo de inferencia)
+- Demo local (Gradio) para probar el modelo
 
 ---
 
 ## 📁 Estructura del repositorio
 
-```text
-CODE2-T5/
-├── data/
-│   ├── train.json
-│   ├── valid.json
-│   └── README.md
-├── models/
-│   ├── full_fp32/
-│   └── onnx_int8_dynamic/
-├── scripts/
-│   ├── data_generation.py
-│   ├── training.py
-│   ├── evaluate.py
-│   ├── export_onnx_quantize.py
-│   └── compare_models.py
-├── deployment/
-│   ├── cli.py
-│   └── app_gradio.py
-├── requirements.txt
-└── README.md
-```
+
+CODE2_AI/
+├─ datasource/
+│  ├─ train.json
+│  ├─ valid.json
+│  └─ test.json
+│
+├─ models/
+│  ├─ full_fp32/           # modelo PyTorch (fine-tuning completo)
+│  └─ onnx_int8_dynamic/   # modelo ONNX cuantizado INT8 dinámico
+│
+├─ scripts/
+│  ├─ training.py
+│  ├─ evaluate.py
+│  ├─ quantize_onnx_int8_dynamic.py
+│  ├─ showcase.py
+│  ├─ data-generation.py
+│  └─ test_env.py
+│
+├─ README.md
+└─ requirements.txt
 
 ---
 
-## ⚙️ Instalación
+## ✅ Instalación
 
-Recomendado: entorno virtual.
+Se recomienda entorno virtual:
 
 ```bash
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# Linux/Mac
-source venv/bin/activate
-```
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# Linux/Mac:
+source .venv/bin/activate
+````
 
-Instalar dependencias:
+Instalación de dependencias:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-> Nota: si se usa `transformers`, es importante mantener `huggingface-hub < 1.0` para compatibilidad.
+---
+
+## 🏋️ Entrenamiento (Full Fine-Tuning)
+
+Entrena un modelo y lo guarda en `models/full_fp32/`.
+
+```bash
+python scripts/training.py \
+  --model_name t5-small \
+  --train_json datasource/train.json \
+  --valid_json datasource/valid.json \
+  --save_dir models/full_fp32
+```
+
+> Para continuar entrenando desde un modelo ya afinado (no desde `t5-small`), usa:
+
+```bash
+python scripts/training.py \
+  --model_name models/full_fp32 \
+  --train_json datasource/train.json \
+  --valid_json datasource/valid.json \
+  --save_dir models/full_fp32
+```
 
 ---
 
-## 🚀 Uso rápido (CLI)
+## ⚙️ Cuantización ONNX INT8 (PTQ dinámico)
 
-Ejecuta el traductor desde consola y elige el modelo (FP32 u ONNX INT8):
+Exporta a ONNX y aplica cuantización INT8 dinámica. Guarda el resultado en `models/onnx_int8_dynamic/`.
 
 ```bash
-python deployment/cli.py
+python scripts/quantize_onnx_int8_dynamic.py \
+  --model_dir models/full_fp32 \
+  --out_dir models/onnx_int8_dynamic
 ```
 
-Ejemplo de entrada:
+---
+
+## 📊 Evaluación
+
+Evalúa **dos modelos**:
+
+* `models/full_fp32/` (PyTorch FP32)
+* `models/onnx_int8_dynamic/` (ONNX INT8 dinámico)
+
+```bash
+python scripts/evaluate.py \
+  --fp32_dir models/full_fp32 \
+  --onnx_dir models/onnx_int8_dynamic \
+  --valid_json datasource/valid.json \
+  --n 2000
+```
+
+Métricas calculadas:
+
+* Exact Match (con normalización de espacios y saltos de línea)
+* BLEU
+* ROUGE-L
+* Tiempo medio de inferencia
+* Longitud media en tokens
+
+---
+
+## 🧪 Demo local (Gradio)
+
+Lanza una app local para introducir instrucciones multilínea y elegir modelo (FP32 u ONNX INT8).
+
+```bash
+python scripts/showcase.py
+```
+
+---
+
+## 🧠 Formato esperado
+
+### Entrada (NL)
+
+* Texto multilínea (una instrucción por línea)
+* Se permite variación de mayúsculas/minúsculas
+
+Ejemplo:
 
 ```text
 Suma r1 y r2 y guarda en r3
 Guarda r3 en la dirección 0345
 ```
 
-Salida esperada:
+### Salida (CODE-2)
+
+Ejemplo:
 
 ```text
 ADDS r3,r1,r2
@@ -93,124 +152,25 @@ ST [rD+H'45'],r3 ; rD = 0300
 
 ---
 
-## 🌐 Demo web (Gradio)
+## 📌 Notas de compatibilidad
 
-### Local
-
-```bash
-python deployment/app_gradio.py
-```
-
-La interfaz permite:
-
-* Cambiar entre modelo **FP32** y **ONNX INT8**
-* Ajustar `num_beams` (beam search)
-* Medir tiempo de inferencia en cada ejecución
-
-### Hugging Face Spaces
-
-Este mismo archivo es compatible con Spaces (modo CPU).
-Solo es necesario subirlo como `app.py` junto con `requirements.txt` y los directorios de modelo.
-
----
-
-## 🧪 Evaluación (métricas)
-
-Evalúa un modelo usando `valid.json`:
+* `transformers` requiere `huggingface-hub<1.0`.
+  Si al instalar aparece `huggingface-hub==1.x`, desinstala y vuelve a instalar:
 
 ```bash
-python scripts/evaluate.py --model_path models/full_fp32 --valid_path data/valid.json
-```
-
-Métricas calculadas:
-
-* Exact Match (con normalización de saltos y tokens especiales)
-* BLEU
-* ROUGE-L
-* Tiempo medio de inferencia
-* Tokens medios generados
-
----
-
-## 🧠 Entrenamiento (Full fine-tuning)
-
-Entrena T5 con el dataset JSON generado:
-
-```bash
-python scripts/training.py --train data/train.json --valid data/valid.json --save_dir models/full_fp32
-```
-
-El entrenamiento:
-
-* Tokeniza entrada/salida con padding y truncation
-* Ajusta `max_length` en función del dataset
-* Guarda modelo y tokenizer al final
-
----
-
-## 🧰 Generación de datos (dataset sintético)
-
-Genera un dataset NL → CODE-2 en formato JSON:
-
-```bash
-python scripts/data_generation.py
-```
-
-El generador:
-
-* Produce instrucciones válidas y casos con error (≈10%)
-* Evita duplicados
-* Construye bloques multilínea (hasta 11 instrucciones)
-* Mantiene saltos de línea como `\n` reales
-
----
-
-## 🧮 Cuantización (PTQ INT8)
-
-### 1) PTQ dinámico INT8 (PyTorch)
-
-Se aplica `dynamic quantization` sobre capas `nn.Linear` en CPU.
-
-```bash
-python scripts/ptq_dynamic_int8.py --model_path models/full_fp32 --out_dir models/ptq_int8_dynamic
-```
-
-### 2) Exportación a ONNX + cuantización INT8 dinámica
-
-```bash
-python scripts/export_onnx_quantize.py --model_path models/full_fp32 --out_dir models/onnx_int8_dynamic
+pip uninstall -y huggingface-hub
+pip install "huggingface-hub<1.0"
 ```
 
 ---
 
-## ➕ Cómo añadir nuevas instrucciones (extender CODE-2)
+## 📜 Licencia
 
-1. Edita `scripts/data_generation.py`:
+Placeholder (pendiente de definir).
 
-   * Añade una plantilla NL nueva
-   * Añade el formato CODE-2 correspondiente
-2. Genera dataset:
-
-   ```bash
-   python scripts/data_generation.py
-   ```
-3. Entrena o continúa entrenamiento:
-
-   ```bash
-   python scripts/training.py --train data/train.json --valid data/valid.json --save_dir models/full_fp32
-   ```
+```
 
 ---
 
-## 📌 Reproducibilidad
-
-* Se fija `seed` en entrenamiento/evaluación.
-* Se mantiene un pipeline completo: generación → entrenamiento → evaluación → despliegue.
-* Los modelos se guardan junto con el tokenizer utilizado.
-
----
-
-## 📄 Licencia
-
-Uso académico / TFG.
-Si se publica abiertamente, se recomienda añadir una licencia (MIT o Apache-2.0).
+Si quieres, en el siguiente paso te dejo **el contenido recomendado de cada script** (`evaluate.py`, `quantize_onnx_int8_dynamic.py`, `showcase.py`) con rutas ya alineadas a tu repo (`datasource/` y `models/`).
+```
