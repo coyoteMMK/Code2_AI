@@ -190,6 +190,19 @@ def generar_dataset(n_ejemplos, max_instrucciones=11):
     print(f"🔍 Intentos totales: {intentos}")
     return dataset
 
+def max_lens(examples):
+    max_in, max_out = 0, 0
+    max_in_lines, max_out_lines = 0, 0
+    for ex in examples:
+        inp = ex["input"]
+        out = ex["output"]
+        max_in = max(max_in, len(inp))
+        max_out = max(max_out, len(out))
+        max_in_lines = max(max_in_lines, inp.count("\n") + 1 if inp else 0)
+        max_out_lines = max(max_out_lines, out.count("\n") + 1 if out else 0)
+    return max_in, max_out, max_in_lines, max_out_lines
+
+
 # ======= Main =======
 def main():
     ap = argparse.ArgumentParser()
@@ -212,6 +225,11 @@ def main():
 
     dataset = generar_dataset(args.n_total, max_instrucciones=args.max_instr)
     random.shuffle(dataset)
+
+    max_in, max_out, max_in_lines, max_out_lines = max_lens(dataset)
+    print("\n📏 Longitudes máximas en el dataset (antes del split):")
+    print(f"   Input : {max_in} caracteres | {max_in_lines} líneas")
+    print(f"   Output: {max_out} caracteres | {max_out_lines} líneas")
 
     n_train = int(args.train_ratio * args.n_total)
     n_valid = int(args.valid_ratio * args.n_total)
