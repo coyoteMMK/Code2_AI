@@ -1,0 +1,38 @@
+# =========================
+# Core ML
+# =========================
+torch==2.1.2
+transformers==4.49.0
+tokenizers==0.21.0
+
+# IMPORTANTE: compatible con transformers
+huggingface-hub>=0.26.0,<1.0
+
+# =========================
+# ONNX + Quantization
+# =========================
+onnx==1.15.0
+onnxruntime==1.17.3
+optimum==1.23.3
+
+# =========================
+# Dataset & evaluation
+# =========================
+datasets==2.18.0
+evaluate==0.4.1
+numpy>=1.24.0
+tqdm>=4.66.0
+
+# =========================
+# Deployment
+# =========================
+gradio==4.44.0
+fastapi==0.110.0
+uvicorn==0.29.0
+
+# =========================
+# Utils
+# =========================
+regex
+sentencepiece
+scikit-learn
