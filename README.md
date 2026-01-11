@@ -43,6 +43,7 @@ CODE2-T5/
 │   └── app_gradio.py
 ├── requirements.txt
 └── README.md
+```
 
 ---
 
@@ -213,16 +214,3 @@ python scripts/export_onnx_quantize.py --model_path models/full_fp32 --out_dir m
 
 Uso académico / TFG.
 Si se publica abiertamente, se recomienda añadir una licencia (MIT o Apache-2.0).
-
-```
-
----
-
-### Siguiente paso
-Para seguir “paso a paso” como quieres:
-
-1) dime el **nombre exacto del repo** (ej: `code2-t5`)  
-2) dime si vas a subir **pesos** al repo o solo enlaces a Hugging Face
-
-y te preparo el `requirements.txt` compatible (evitando el error de `huggingface-hub==1.2.4`) y los textos cortos del `data/README.md`.
-```
