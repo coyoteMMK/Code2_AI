@@ -1,0 +1,121 @@
+# scripts/training.py
+import argparse
+import time
+import subprocess
+import torch
+from transformers import (
+    T5ForConditionalGeneration,
+    T5Tokenizer,
+    TrainingArguments,
+    Trainer,
+    DataCollatorForSeq2Seq,
+    set_seed,
+)
+from datasets import load_dataset
+
+def get_used_gpu_memory():
+    try:
+        out = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,nounits,noheader"]
+        )
+        return int(out.decode("utf-8").split("\n")[0])
+    except Exception:
+        return None
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model_name", default="t5-small")
+    ap.add_argument("--train_json", default="data/train.json")
+    ap.add_argument("--valid_json", default="data/valid.json")
+    ap.add_argument("--save_dir", default="models/full_fp32")
+    ap.add_argument("--seed", type=int, default=42)
+
+    # hiperparámetros (ponemos tus finales por defecto)
+    ap.add_argument("--lr", type=float, default=0.0004994714149356016)
+    ap.add_argument("--batch", type=int, default=16)
+    ap.add_argument("--grad_accum", type=int, default=1)
+    ap.add_argument("--weight_decay", type=float, default=0.0061472284302228454)
+    ap.add_argument("--epochs", type=int, default=3)
+
+    ap.add_argument("--max_input_len", type=int, default=402)
+    ap.add_argument("--max_output_len", type=int, default=511)
+    ap.add_argument("--fp16", action="store_true", default=True)
+    args = ap.parse_args()
+
+    set_seed(args.seed)
+
+    print("🧠 Cargando tokenizer...")
+    tokenizer = T5Tokenizer.from_pretrained(args.model_name)
+    tokenizer.add_special_tokens({"additional_special_tokens": ["\n"]})
+
+    print("🧠 Cargando modelo...")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = T5ForConditionalGeneration.from_pretrained(args.model_name).to(device)
+
+    # importante: resize para ver el token nuevo
+    model.resize_token_embeddings(len(tokenizer))
+
+    print("📦 Cargando dataset...")
+    dataset_raw = load_dataset("json", data_files={"train": args.train_json, "validation": args.valid_json})
+
+    def preprocess(examples):
+        x = tokenizer(examples["input"], max_length=args.max_input_len, truncation=True, padding="max_length")
+        y = tokenizer(examples["output"], max_length=args.max_output_len, truncation=True, padding="max_length")
+        x["labels"] = y["input_ids"]
+        return x
+
+    dataset = dataset_raw.map(preprocess, batched=True, remove_columns=["task", "input", "output"])
+
+    training_args = TrainingArguments(
+        output_dir=args.save_dir,
+        per_device_train_batch_size=args.batch,
+        per_device_eval_batch_size=args.batch,
+        num_train_epochs=args.epochs,
+        learning_rate=args.lr,
+        weight_decay=args.weight_decay,
+        evaluation_strategy="epoch",
+        save_strategy="epoch",
+        logging_steps=25,
+        fp16=args.fp16 and (device == "cuda"),
+        seed=args.seed,
+        gradient_accumulation_steps=args.grad_accum,
+        report_to=[],
+    )
+
+    data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset["train"],
+        eval_dataset=dataset["validation"],
+        data_collator=data_collator,
+        tokenizer=tokenizer,
+    )
+
+    print("🚀 Entrenando...")
+    start = time.time()
+    trainer.train()
+    eval_result = trainer.evaluate()
+    end = time.time()
+
+    gpu_used = get_used_gpu_memory()
+    train_loss = next((log["loss"] for log in reversed(trainer.state.log_history) if "loss" in log), None)
+    loss_gap = float(train_loss) - eval_result["eval_loss"] if train_loss is not None else None
+
+    print("\n=== RESULTADOS FULL FINE-TUNING ===")
+    print(f"📉 Eval Loss: {eval_result['eval_loss']:.6f}")
+    if train_loss is not None:
+        print(f"🧪 Train Loss: {train_loss:.6f}")
+    if loss_gap is not None:
+        print(f"📊 Loss Gap: {loss_gap:.6f}")
+    print(f"💻 GPU usada: {gpu_used} MB" if gpu_used else "💻 GPU usada: N/A")
+    print(f"⏱️ Duración: {round((end - start)/60, 2)} min")
+
+    print("\n💾 Guardando modelo + tokenizer...")
+    model.save_pretrained(args.save_dir)
+    tokenizer.save_pretrained(args.save_dir)
+    print(f"✅ Guardado en: {args.save_dir}")
+
+if __name__ == "__main__":
+    main()

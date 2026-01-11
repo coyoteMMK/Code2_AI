@@ -1,0 +1,230 @@
+# scripts/data-generation.py
+import argparse
+import json
+import random
+import time
+
+# ======= Tu generador (resumen de tu lógica) =======
+REGISTROS = [f"r{i:X}" for i in range(16)]
+
+PLANTILLAS = {
+    "LD": [
+        "Carga el valor de la dirección {} en {}",
+        "Lee la dirección {} y guárdala en {}",
+        "Trae el contenido de {} y ponlo en {}"
+    ],
+    "ST": [
+        "Guarda el contenido de {} en la dirección {}",
+        "Almacena el valor de {} en {}",
+        "Escribe {} en la memoria {}"
+    ],
+    "ADDS": [
+        "Suma {} y {} y guarda el resultado en {}",
+        "Añade {} a {} y almacena en {}"
+    ],
+    "SUBS": [
+        "Resta {} y {} y guárdalo en {}",
+        "Calcula {} menos {} y guarda en {}"
+    ]
+}
+
+def variar_capitalizacion(frase):
+    variantes = [
+        frase.lower(),
+        frase.upper(),
+        frase.capitalize(),
+        " ".join([w.capitalize() for w in frase.split()]),
+        frase
+    ]
+    return random.choice(variantes)
+
+def registro_invalido():
+    opciones = [
+        "",
+        "r",
+        "r" + "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=1)),
+        "r" + str(random.randint(16, 255)),
+        "r" + "".join(random.choices("XYZ123", k=random.randint(2, 4)))
+    ]
+    return random.choice(opciones)
+
+def direccion_invalida():
+    opciones = []
+    opciones.append("")
+    opciones.append("".join(random.choices("0123456789ABCDEF", k=random.randint(5, 6))))
+    base = "".join(random.choices("0123456789ABCDEF", k=random.randint(2, 3)))
+    ruido = "".join(random.choices("GHIJKLMNOPQRSTUVWXYZ@$%", k=random.randint(1, 2)))
+    opciones.append("".join(random.sample(base + ruido, len(base) + len(ruido))))
+    opciones.append("mem" + str(random.randint(100, 999)))
+    opciones.append("0A" + random.choice([" ", "@", "!"]) + random.choice("123GZ"))
+    return random.choice(opciones)
+
+def generar_par():
+    tipo = random.choice(["LD", "ST", "ADDS", "SUBS"])
+    es_error = random.random() < 0.1
+    error_tipo = random.choice(["reg", "dir", "ambos"]) if es_error else "ninguno"
+
+    if tipo in ["ADDS", "SUBS"]:
+        r1 = registro_invalido() if error_tipo in ["reg", "ambos"] and random.random() < 0.5 else random.choice(REGISTROS)
+        r2 = registro_invalido() if error_tipo in ["reg", "ambos"] and random.random() < 0.5 else random.choice(REGISTROS)
+        r3 = registro_invalido() if error_tipo in ["reg", "ambos"] and random.random() < 0.5 else random.choice(REGISTROS)
+
+        nl = variar_capitalizacion(random.choice(PLANTILLAS[tipo]).format(r1, r2, r3))
+
+        errores = []
+        for r in [r1, r2, r3]:
+            if not r or r == "r":
+                errores.append(f"registro '{r}' ambiguo")
+            elif not r.startswith("r") or len(r) < 2:
+                errores.append(f"registro '{r}' mal formado")
+            elif r not in REGISTROS:
+                errores.append(f"registro '{r}' invalido")
+
+        if errores:
+            code2 = f"Error: {' y '.join(errores)}"
+        else:
+            code2 = f"{tipo} {r3},{r1},{r2}"
+
+    elif tipo == "LD":
+        reg = registro_invalido() if error_tipo in ["reg", "ambos"] else random.choice(REGISTROS)
+        direccion = direccion_invalida() if error_tipo in ["dir", "ambos"] else "".join(random.choices("0123456789ABCDEF", k=random.randint(1, 4)))
+        nl = variar_capitalizacion(random.choice(PLANTILLAS["LD"]).format(direccion, reg))
+
+        errores = []
+        if not reg or reg == "r":
+            errores.append(f"registro '{reg}' ambiguo")
+        elif not reg.startswith("r") or len(reg) < 2:
+            errores.append(f"registro '{reg}' mal formado")
+        elif reg not in REGISTROS:
+            errores.append(f"registro '{reg}' invalido")
+
+        if not direccion:
+            errores.append("dirección vacia (ambigua)")
+        else:
+            if any(c not in "0123456789ABCDEFabcdef" for c in direccion):
+                errores.append(f"dirección '{direccion}' contiene caracteres no hexadecimales")
+            if len(direccion) > 4:
+                errores.append(f"dirección '{direccion}' excede 4 digitos")
+
+        if errores:
+            code2 = f"Error: {' y '.join(errores)}"
+        else:
+            d = direccion.upper().rjust(4, "0")
+            v = d[-2:]
+            rd_base = d[:-2] or "00"
+            code2 = f"LD {reg},[rD+H'{v}']  ; rD = {rd_base}00"
+
+    else:  # ST
+        reg = registro_invalido() if error_tipo in ["reg", "ambos"] else random.choice(REGISTROS)
+        direccion = direccion_invalida() if error_tipo in ["dir", "ambos"] else "".join(random.choices("0123456789ABCDEF", k=random.randint(1, 4)))
+        nl = variar_capitalizacion(random.choice(PLANTILLAS["ST"]).format(reg, direccion))
+
+        errores = []
+        if not reg or reg == "r":
+            errores.append(f"registro '{reg}' ambiguo")
+        elif not reg.startswith("r") or len(reg) < 2:
+            errores.append(f"registro '{reg}' mal formado")
+        elif reg not in REGISTROS:
+            errores.append(f"registro '{reg}' invalido")
+
+        if not direccion:
+            errores.append("dirección vacía (ambigua)")
+        else:
+            if any(c not in "0123456789ABCDEFabcdef" for c in direccion):
+                errores.append(f"dirección '{direccion}' contiene caracteres no hexadecimales")
+            if len(direccion) > 4:
+                errores.append(f"dirección '{direccion}' excede 4 digitos")
+
+        if errores:
+            code2 = f"Error: {' y '.join(errores)}"
+        else:
+            d = direccion.upper().rjust(4, "0")
+            v = d[-2:]
+            rd_base = d[:-2] or "00"
+            code2 = f"ST [rD+H'{v}'],{reg}  ; rD = {rd_base}00"
+
+    return nl, code2
+
+def generar_bloque(max_instrucciones=11):
+    # distribución parecida a la que usas (más probabilidad en longitudes medias-altas)
+    n = random.choices(list(range(1, max_instrucciones + 1)), weights=[1,1,2,3,4,5,5,4,3,2,1][:max_instrucciones])[0]
+    lineas_nl, lineas_code2 = [], []
+    for _ in range(n):
+        nl, code = generar_par()
+        lineas_nl.append(nl)
+        lineas_code2.append(code)
+
+    return {
+        "task": "nl_to_code2",
+        "input": "\n".join(lineas_nl),
+        "output": "\n".join(lineas_code2),
+    }
+
+def generar_dataset(n_ejemplos, max_instrucciones=11):
+    dataset = []
+    seen = set()
+    intentos = 0
+    while len(dataset) < n_ejemplos:
+        intentos += 1
+        ex = generar_bloque(max_instrucciones=max_instrucciones)
+        key = ex["input"] + "|" + ex["output"]
+        if key not in seen:
+            seen.add(key)
+            dataset.append(ex)
+        if len(dataset) % 5000 == 0 and len(dataset) != 0:
+            print(f"▌ Progreso: {len(dataset)}/{n_ejemplos} ejemplos únicos...")
+    print(f"🔍 Intentos totales: {intentos}")
+    return dataset
+
+# ======= Main =======
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out_dir", default="data", help="Carpeta de salida")
+    ap.add_argument("--n_total", type=int, default=50000)
+    ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--max_instr", type=int, default=11)
+    ap.add_argument("--train_ratio", type=float, default=0.80)
+    ap.add_argument("--valid_ratio", type=float, default=0.20)  # test opcional
+    ap.add_argument("--test_ratio", type=float, default=0.00)
+    args = ap.parse_args()
+
+    if abs(args.train_ratio + args.valid_ratio + args.test_ratio - 1.0) > 1e-6:
+        raise ValueError("train_ratio + valid_ratio + test_ratio debe sumar 1.0")
+
+    random.seed(args.seed)
+
+    print("\n⚙️ INICIANDO GENERADOR")
+    time.sleep(0.2)
+
+    dataset = generar_dataset(args.n_total, max_instrucciones=args.max_instr)
+    random.shuffle(dataset)
+
+    n_train = int(args.train_ratio * args.n_total)
+    n_valid = int(args.valid_ratio * args.n_total)
+    n_test = args.n_total - n_train - n_valid
+
+    train = dataset[:n_train]
+    valid = dataset[n_train:n_train + n_valid]
+    test = dataset[n_train + n_valid:] if n_test > 0 else []
+
+    import os
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    with open(f"{args.out_dir}/train.json", "w", encoding="utf-8") as f:
+        json.dump(train, f, indent=2, ensure_ascii=False)
+
+    with open(f"{args.out_dir}/valid.json", "w", encoding="utf-8") as f:
+        json.dump(valid, f, indent=2, ensure_ascii=False)
+
+    if n_test > 0:
+        with open(f"{args.out_dir}/test.json", "w", encoding="utf-8") as f:
+            json.dump(test, f, indent=2, ensure_ascii=False)
+
+    print("\n✅ Dataset generado:")
+    print(f"   Train: {len(train)} -> {args.out_dir}/train.json")
+    print(f"   Valid: {len(valid)} -> {args.out_dir}/valid.json")
+    if n_test > 0:
+        print(f"   Test : {len(test)} -> {args.out_dir}/test.json")
+
+if __name__ == "__main__":
+    main()
