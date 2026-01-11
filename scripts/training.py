@@ -13,6 +13,7 @@ from transformers import (
 )
 from datasets import load_dataset
 
+
 def get_used_gpu_memory():
     try:
         out = subprocess.check_output(
@@ -22,15 +23,23 @@ def get_used_gpu_memory():
     except Exception:
         return None
 
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model_name", default="t5-small")
+
+    # 🔹 CLAVE: modelo inicial (HF o ruta local)
+    ap.add_argument(
+        "--model_path",
+        default="models/full_fp32",
+        help="Modelo base: nombre HF (t5-small) o ruta local entrenada"
+    )
+
     ap.add_argument("--train_json", default="data/train.json")
     ap.add_argument("--valid_json", default="data/valid.json")
-    ap.add_argument("--save_dir", default="models/full_fp32")
+    ap.add_argument("--save_dir", default="models/full_fp32_extended")
     ap.add_argument("--seed", type=int, default=42)
 
-    # hiperparámetros (ponemos tus finales por defecto)
+    # hiperparámetros finales
     ap.add_argument("--lr", type=float, default=0.0004994714149356016)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--grad_accum", type=int, default=1)
@@ -40,31 +49,50 @@ def main():
     ap.add_argument("--max_input_len", type=int, default=402)
     ap.add_argument("--max_output_len", type=int, default=511)
     ap.add_argument("--fp16", action="store_true", default=True)
-    args = ap.parse_args()
 
+    args = ap.parse_args()
     set_seed(args.seed)
 
-    print("🧠 Cargando tokenizer...")
-    tokenizer = T5Tokenizer.from_pretrained(args.model_name)
-    tokenizer.add_special_tokens({"additional_special_tokens": ["\n"]})
-
-    print("🧠 Cargando modelo...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = T5ForConditionalGeneration.from_pretrained(args.model_name).to(device)
 
-    # importante: resize para ver el token nuevo
+    print("🧠 Cargando tokenizer desde:", args.model_path)
+    tokenizer = T5Tokenizer.from_pretrained(args.model_path)
+
+    # token especial salto de línea (si no existe ya)
+    if "\n" not in tokenizer.get_vocab():
+        tokenizer.add_special_tokens({"additional_special_tokens": ["\n"]})
+
+    print("🧠 Cargando modelo desde:", args.model_path)
+    model = T5ForConditionalGeneration.from_pretrained(args.model_path).to(device)
     model.resize_token_embeddings(len(tokenizer))
 
     print("📦 Cargando dataset...")
-    dataset_raw = load_dataset("json", data_files={"train": args.train_json, "validation": args.valid_json})
+    dataset_raw = load_dataset(
+        "json",
+        data_files={"train": args.train_json, "validation": args.valid_json},
+    )
 
     def preprocess(examples):
-        x = tokenizer(examples["input"], max_length=args.max_input_len, truncation=True, padding="max_length")
-        y = tokenizer(examples["output"], max_length=args.max_output_len, truncation=True, padding="max_length")
+        x = tokenizer(
+            examples["input"],
+            max_length=args.max_input_len,
+            truncation=True,
+            padding="max_length",
+        )
+        y = tokenizer(
+            examples["output"],
+            max_length=args.max_output_len,
+            truncation=True,
+            padding="max_length",
+        )
         x["labels"] = y["input_ids"]
         return x
 
-    dataset = dataset_raw.map(preprocess, batched=True, remove_columns=["task", "input", "output"])
+    dataset = dataset_raw.map(
+        preprocess,
+        batched=True,
+        remove_columns=["task", "input", "output"],
+    )
 
     training_args = TrainingArguments(
         output_dir=args.save_dir,
@@ -89,21 +117,28 @@ def main():
         args=training_args,
         train_dataset=dataset["train"],
         eval_dataset=dataset["validation"],
-        data_collator=data_collator,
         tokenizer=tokenizer,
+        data_collator=data_collator,
     )
 
-    print("🚀 Entrenando...")
+    print("🚀 Entrenando modelo...")
     start = time.time()
     trainer.train()
     eval_result = trainer.evaluate()
     end = time.time()
 
     gpu_used = get_used_gpu_memory()
-    train_loss = next((log["loss"] for log in reversed(trainer.state.log_history) if "loss" in log), None)
-    loss_gap = float(train_loss) - eval_result["eval_loss"] if train_loss is not None else None
+    train_loss = next(
+        (log["loss"] for log in reversed(trainer.state.log_history) if "loss" in log),
+        None,
+    )
+    loss_gap = (
+        float(train_loss) - eval_result["eval_loss"]
+        if train_loss is not None
+        else None
+    )
 
-    print("\n=== RESULTADOS FULL FINE-TUNING ===")
+    print("\n=== RESULTADOS ENTRENAMIENTO ===")
     print(f"📉 Eval Loss: {eval_result['eval_loss']:.6f}")
     if train_loss is not None:
         print(f"🧪 Train Loss: {train_loss:.6f}")
@@ -112,10 +147,11 @@ def main():
     print(f"💻 GPU usada: {gpu_used} MB" if gpu_used else "💻 GPU usada: N/A")
     print(f"⏱️ Duración: {round((end - start)/60, 2)} min")
 
-    print("\n💾 Guardando modelo + tokenizer...")
+    print("\n💾 Guardando modelo y tokenizer...")
     model.save_pretrained(args.save_dir)
     tokenizer.save_pretrained(args.save_dir)
     print(f"✅ Guardado en: {args.save_dir}")
+
 
 if __name__ == "__main__":
     main()

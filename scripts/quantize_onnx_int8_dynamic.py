@@ -1,130 +1,85 @@
 # scripts/quantize_onnx_int8_dynamic.py
-import argparse
 import os
-import shutil
+import argparse
+from pathlib import Path
 
 from transformers import T5Tokenizer
 from optimum.onnxruntime import ORTModelForSeq2SeqLM
 
-# onnxruntime quantization
 from onnxruntime.quantization import quantize_dynamic, QuantType
 
 
-def find_onnx_files(folder: str):
-    """Devuelve lista de ficheros .onnx dentro de una carpeta (no recursivo)."""
-    return [os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith(".onnx")]
-
-
-def copy_tokenizer_and_config(src_dir: str, dst_dir: str):
+def quantizar_directorio_onnx(input_dir: str, output_dir: str):
     """
-    Copia config/tokenizer al directorio destino para que ORTModelForSeq2SeqLM
-    pueda cargarse como carpeta HuggingFace.
+    Cuantiza todos los .onnx dentro de input_dir y guarda en output_dir
+    manteniendo los mismos nombres de archivo.
     """
-    os.makedirs(dst_dir, exist_ok=True)
+    input_dir = Path(input_dir)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Archivos típicos
-    candidates = [
-        "config.json",
-        "tokenizer_config.json",
-        "special_tokens_map.json",
-        "spiece.model",
-        "tokenizer.json",
-        "generation_config.json",
-    ]
+    onnx_files = sorted(list(input_dir.glob("*.onnx")))
+    if not onnx_files:
+        raise FileNotFoundError(f"No se encontraron .onnx en: {input_dir}")
 
-    for name in candidates:
-        src = os.path.join(src_dir, name)
-        if os.path.exists(src):
-            shutil.copy2(src, os.path.join(dst_dir, name))
+    print(f"🔎 ONNX encontrados: {len(onnx_files)}")
+    for f in onnx_files:
+        out_path = output_dir / f.name
+        print(f"⚙️ Cuantizando: {f.name} -> {out_path.name}")
 
-    # También copiamos added_tokens.json si existe
-    extra = os.path.join(src_dir, "added_tokens.json")
-    if os.path.exists(extra):
-        shutil.copy2(extra, os.path.join(dst_dir, "added_tokens.json"))
+        # PTQ dinámico: no necesita dataset
+        quantize_dynamic(
+            model_input=str(f),
+            model_output=str(out_path),
+            weight_type=QuantType.QInt8,   # INT8 dinámico
+            per_channel=True,              # suele mejorar calidad
+        )
+
+    print("✅ Cuantización dinámica INT8 completada para todos los ONNX.")
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument(
-        "--model_dir",
-        required=True,
-        help="Carpeta del modelo PyTorch (e.g. ../5.Train_final/results_FullFineTuning_Final_50k)"
-    )
-    ap.add_argument(
-        "--out_onnx_fp32",
-        default="./t5_onnx_fp32",
-        help="Salida ONNX FP32 (carpeta)"
-    )
-    ap.add_argument(
-        "--out_onnx_int8",
-        default="./t5_onnx_int8_dynamic",
-        help="Salida ONNX INT8 dinámico (carpeta)"
-    )
-    ap.add_argument(
-        "--opset",
-        type=int,
-        default=14,
-        help="Opset ONNX (14 suele funcionar bien con T5)"
-    )
-    ap.add_argument(
-        "--per_channel",
-        action="store_true",
-        help="Activa cuantización per-channel (a veces mejora precisión, a veces no cambia)."
-    )
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fp32_dir", default="models/full_fp32/", help="Directorio del modelo Transformers FP32")
+    parser.add_argument("--onnx_fp32_dir", default="models/onnx_fp32/", help="Salida ONNX FP32")
+    parser.add_argument("--onnx_int8_dir", default="models/onnx_int8_dynamic/", help="Salida ONNX INT8 dinámico")
+    args = parser.parse_args()
 
-    os.makedirs(args.out_onnx_fp32, exist_ok=True)
-    os.makedirs(args.out_onnx_int8, exist_ok=True)
+    fp32_dir = args.fp32_dir
+    onnx_fp32_dir = args.onnx_fp32_dir
+    onnx_int8_dir = args.onnx_int8_dir
 
-    # 1) Exportar a ONNX FP32
+    os.makedirs(onnx_fp32_dir, exist_ok=True)
+    os.makedirs(onnx_int8_dir, exist_ok=True)
+
+    print("🔧 Cargando tokenizer (desde el modelo FP32)...")
+    tokenizer = T5Tokenizer.from_pretrained(fp32_dir)
+
+    # 1) Exportar a ONNX FP32 (Optimum)
     print("🧠 Exportando Transformers -> ONNX (FP32) con Optimum...")
-    ort_model = ORTModelForSeq2SeqLM.from_pretrained(
-        args.model_dir,
-        export=True,
-        opset=args.opset
-    )
-    ort_model.save_pretrained(args.out_onnx_fp32)
+    # Nota: en tu versión, export=True funciona (y evita from_transformers)
+    ort_model = ORTModelForSeq2SeqLM.from_pretrained(fp32_dir, export=True)
+    ort_model.save_pretrained(onnx_fp32_dir)
+    tokenizer.save_pretrained(onnx_fp32_dir)
+    print(f"✅ ONNX FP32 guardado en: {onnx_fp32_dir}")
 
-    # Guardar tokenizer en carpeta ONNX FP32
-    print("🔧 Guardando tokenizer/config...")
-    tokenizer = T5Tokenizer.from_pretrained(args.model_dir)
-    tokenizer.save_pretrained(args.out_onnx_fp32)
+    # 2) Cuantizar ONNX -> INT8 dinámico
+    print("⚙️ Cuantizando ONNX con PTQ dinámico INT8...")
+    quantizar_directorio_onnx(onnx_fp32_dir, onnx_int8_dir)
 
-    print(f"✅ ONNX FP32 guardado en: {args.out_onnx_fp32}")
+    # Copiar tokenizer/config al dir INT8 (para cargar ORTModelForSeq2SeqLM)
+    print("📦 Guardando tokenizer/config en la carpeta INT8...")
+    tokenizer.save_pretrained(onnx_int8_dir)
 
-    # 2) Cuantizar dinámico INT8
-    print("⚙️ Cuantizando ONNX con PTQ dinámico INT8 (quantize_dynamic)...")
+    # Cargar y volver a guardar ORTModel apuntando a los ONNX INT8 (mantiene estructura)
+    # (Esto asegura que el directorio INT8 tenga el layout esperado por Optimum)
+    print("🔁 Re-guardando wrapper ORT en carpeta INT8...")
+    ort_model_int8 = ORTModelForSeq2SeqLM.from_pretrained(onnx_fp32_dir)
+    ort_model_int8.save_pretrained(onnx_int8_dir)
 
-    onnx_files = find_onnx_files(args.out_onnx_fp32)
-    if not onnx_files:
-        raise FileNotFoundError(
-            f"No se encontraron .onnx en {args.out_onnx_fp32}. "
-            "Revisa que el export haya generado archivos ONNX."
-        )
-
-    # Cuantizamos cada .onnx (en seq2seq suele haber encoder/decoder/decoder_with_past)
-    for fp32_path in onnx_files:
-        fname = os.path.basename(fp32_path)
-        int8_path = os.path.join(args.out_onnx_int8, fname)
-
-        print(f"  • {fname} -> INT8")
-        quantize_dynamic(
-            model_input=fp32_path,
-            model_output=int8_path,
-            weight_type=QuantType.QInt8,     # INT8 pesos
-            per_channel=args.per_channel,    # opcional
-            reduce_range=False               # normalmente False
-        )
-
-    # Copiar tokenizer/config para cargar carpeta INT8 como modelo HF
-    copy_tokenizer_and_config(args.out_onnx_fp32, args.out_onnx_int8)
-
-    print("\n✅ Cuantización ONNX INT8 dinámico completada.")
-    print(f"📁 ONNX FP32: {args.out_onnx_fp32}")
-    print(f"📁 ONNX INT8 dinámico: {args.out_onnx_int8}")
-    print("\n🧪 Prueba rápida de carga:")
-    print("   from optimum.onnxruntime import ORTModelForSeq2SeqLM")
-    print(f"   m = ORTModelForSeq2SeqLM.from_pretrained('{args.out_onnx_int8}')")
+    print("\n✅ Proceso completado:")
+    print(f"📁 ONNX FP32: {onnx_fp32_dir}")
+    print(f"📁 ONNX INT8 dinámico: {onnx_int8_dir}")
 
 
 if __name__ == "__main__":
