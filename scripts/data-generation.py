@@ -11,20 +11,34 @@ PLANTILLAS = {
     "LD": [
         "Carga el valor de la dirección {} en {}",
         "Lee la dirección {} y guárdala en {}",
-        "Trae el contenido de {} y ponlo en {}"
+        "Trae el contenido de {} y ponlo en {}",
+        "Copia lo que hay en {} a {}",
+        "Obtén el dato de {} y almacénalo en {}",
+        "Toma el valor de {} y colócalo en {}"
     ],
     "ST": [
         "Guarda el contenido de {} en la dirección {}",
         "Almacena el valor de {} en {}",
-        "Escribe {} en la memoria {}"
+        "Escribe {} en la memoria {}",
+        "Coloca lo que hay en {} dentro de {}",
+        "Pon el dato de {} en la dirección {}",
+        "Graba el valor de {} en la posición de memoria {}"
     ],
     "ADDS": [
         "Suma {} y {} y guarda el resultado en {}",
-        "Añade {} a {} y almacena en {}"
+        "Añade {} a {} y almacena en {}",
+        "Calcula la suma de {} y {} y pon el resultado en {}",
+        "Combina {} con {} y guarda en {}",
+        "Haz la suma entre {} y {} y guárdala en {}",
+        "Une {} y {} y deja el resultado en {}"
     ],
     "SUBS": [
         "Resta {} y {} y guárdalo en {}",
-        "Calcula {} menos {} y guarda en {}"
+        "Calcula {} menos {} y guarda en {}",
+        "Sustrae {} de {} y pon el resultado en {}",
+        "Haz {} - {} y almacena en {}",
+        "Obtén la diferencia entre {} y {} y guarda en {}",
+        "Quita {} a {} y almacénalo en {}"
     ]
 }
 
