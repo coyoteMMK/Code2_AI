@@ -172,7 +172,7 @@ def main():
     print("\n📊 Resultados comparativos:")
     print(df)
     print(f"\n✅ Guardado: {args.out}")
-
+    
 
 if __name__ == "__main__":
     main()
