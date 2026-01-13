@@ -38,7 +38,7 @@ jobs:
       - name: Build static site
         env:
           # ⚠️ Cambia esto por el nombre real de tu repo
-          NEXT_PUBLIC_BASE_PATH: /CODE2_AI
+          NEXT_PUBLIC_BASE_PATH: /Code2_AI
         run: npm run build
 
       - name: Upload artifact
