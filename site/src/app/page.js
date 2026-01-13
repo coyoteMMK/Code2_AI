@@ -1,5 +1,7 @@
 import Image from "next/image";
 
+const base = process.env.NODE_ENV === "production" ? "/Code2_AI" : "";
+
 export default function Home() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
