@@ -25,7 +25,7 @@ export default function Page() {
 
   // 🔁 Endpoint de Gradio. Normalmente es "/predict"
   // Si en "Use via API" te sale otro, cámbialo aquí.
-  const ENDPOINT = useMemo(() => "/predict", []);
+  const ENDPOINT = useMemo(() => "/generar", []);
 
   async function run() {
     if (!input.trim()) return;
