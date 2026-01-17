@@ -9,8 +9,8 @@ from optimum.onnxruntime import ORTModelForSeq2SeqLM
 # -------------------------
 # Rutas en tu PC (local)
 # -------------------------
-MODEL_ONNX_DIR = "./t5_onnx_int8_dynamic"
-MODEL_FP32_DIR = "./results_FullFineTuning_Final_50k"
+MODEL_ONNX_DIR = "../models/full_fp32"
+MODEL_FP32_DIR = "../models/onnx_int8_dynamic"
 
 print("🔧 Cargando tokenizers...")
 tokenizer_onnx = T5Tokenizer.from_pretrained(MODEL_ONNX_DIR)

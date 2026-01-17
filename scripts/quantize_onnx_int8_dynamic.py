@@ -40,9 +40,9 @@ def quantizar_directorio_onnx(input_dir: str, output_dir: str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--fp32_dir", default="models/full_fp32/", help="Directorio del modelo Transformers FP32")
-    parser.add_argument("--onnx_fp32_dir", default="models/onnx_fp32/", help="Salida ONNX FP32")
-    parser.add_argument("--onnx_int8_dir", default="models/onnx_int8_dynamic/", help="Salida ONNX INT8 dinámico")
+    parser.add_argument("--fp32_dir", default="models/full_fp32_extended/", help="Directorio del modelo Transformers FP32")
+    parser.add_argument("--onnx_fp32_dir", default="models/onnx_fp32_extended/", help="Salida ONNX FP32")
+    parser.add_argument("--onnx_int8_dir", default="models/onnx_int8_dynamic_extended/", help="Salida ONNX INT8 dinámico")
     args = parser.parse_args()
 
     fp32_dir = args.fp32_dir
