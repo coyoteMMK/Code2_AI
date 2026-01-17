@@ -39,6 +39,8 @@ CODE2_AI/
 
 ## ✅ Instalación
 
+git clone https://github.com/coyoteMMK/Code2_AI.git
+
 Se recomienda entorno virtual:
 
 ```bash
