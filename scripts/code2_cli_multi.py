@@ -2,6 +2,46 @@
 import os
 import re
 import time
+import sys
+
+def mostrar_banner():
+    """Muestra el banner ASCII art de CODE-2"""
+    banner = r"""
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║   ██████╗ ██████╗ ██████╗ ███████╗    ██████╗                           ║
+║  ██╔════╝██╔═══██╗██╔══██╗██╔════╝    ╚════██╗                          ║
+║  ██║     ██║   ██║██║  ██║█████╗█████╗ █████╔╝                          ║
+║  ██║     ██║   ██║██║  ██║██╔══╝╚════╝██╔═══╝                           ║
+║  ╚██████╗╚██████╔╝██████╔╝███████╗    ███████╗                          ║
+║   ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝    ╚══════╝                          ║
+║                                                                           ║
+║              Natural Language to Assembly Code Generator                  ║
+║                         Version 1.0.0 - 2025                             ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+    """
+    print(banner)
+
+
+def leer_tecla():
+    """Lee una tecla del teclado de forma no bloqueante (Windows)"""
+    if sys.platform == 'win32':
+        import msvcrt
+        if msvcrt.kbhit():
+            key = msvcrt.getch()
+            if key == b'\xe0':  # Teclas especiales
+                key = msvcrt.getch()
+                if key == b'H':  # Flecha arriba
+                    return 'up'
+                elif key == b'P':  # Flecha abajo
+                    return 'down'
+            elif key == b'\r':  # Enter
+                return 'enter'
+            elif key == b'\x1b':  # ESC
+                return 'esc'
+    return None
+
 
 def limpiar_salida(texto: str) -> str:
     # Convierte '\n' literal a salto real
@@ -25,35 +65,87 @@ def limpiar_salida(texto: str) -> str:
 
 
 def leer_entrada_multilinea() -> str:
-    print("\n🧠 Instrucción NL > (multilínea: ENTER para nueva línea, ENTER en blanco para ejecutar)")
+    print("\n╭─────────────────────────────────────────────────────────────────────╮")
+    print("│  📝 Instrucción en Lenguaje Natural                                │")
+    print("│  (Presiona ENTER en línea vacía para ejecutar, o 'salir' para terminar) │")
+    print("╰─────────────────────────────────────────────────────────────────────╯")
+    print("\n> ", end="")
     lineas = []
     while True:
-        try:
-            linea = input()
-        except EOFError:
-            return ""  # por si se cierra stdin
-        if linea.strip().lower() == "salir":
+        linea = input()  # Leer línea del usuario
+        if linea.lower() == "salir":
             return "__SALIR__"
-        if linea == "":
+        if linea == "":  # Si la línea está vacía, salir
             break
         lineas.append(linea)
+        if linea:  # Si hay más texto, mostrar el prompt
+            print("> ", end="")
     return "\n".join(lineas).strip()
 
 
 def elegir_modelo(base_dir: str):
-    print("🟢 CODE-2 CLI - Selección de modelo")
-    print("1) Full fine-tuning (PyTorch)     -> results_FullFineTuning_Final_50k")
-    print("2) ONNX INT8 dynamic (Optimum)    -> t5_onnx_int8_dynamic")
-    opcion = input("Elige [1/2]: ").strip()
-
-    if opcion not in {"1", "2"}:
-        print("⚠️ Opción no válida. Usando 1 por defecto.")
-        opcion = "1"
+    opciones = [
+        {
+            "nombre": "Full Fine-Tuning (PyTorch FP32)",
+            "descripcion": "Modelo completo en precisión FP32 - Mayor precisión",
+            "ruta": "models/full_fp32",
+            "tipo": "pytorch"
+        },
+        {
+            "nombre": "ONNX INT8 Dynamic Quantization",
+            "descripcion": "Modelo optimizado INT8 - Mayor velocidad y eficiencia",
+            "ruta": "models/onnx_int8_dynamic",
+            "tipo": "onnx"
+        }
+    ]
+    
+    seleccion = 0
+    
+    def mostrar_menu():
+        os.system('cls' if os.name == 'nt' else 'clear')
+        mostrar_banner()
+        print("\n╔═══════════════════════════════════════════════════════════════════════════╗")
+        print("║                    SELECCIÓN DE MODELO Y CONFIGURACIÓN                   ║")
+        print("╚═══════════════════════════════════════════════════════════════════════════╝\n")
+        print("  Use las flechas ↑↓ para navegar y ENTER para seleccionar:\n")
+        
+        for i, opcion in enumerate(opciones):
+            if i == seleccion:
+                print(f"  ► {i+1}. {opcion['nombre']}")
+                print(f"      {opcion['descripcion']}")
+            else:
+                print(f"    {i+1}. {opcion['nombre']}")
+                print(f"      {opcion['descripcion']}")
+        print()
+    
+    # Mostrar menú inicial
+    mostrar_menu()
+    
+    import msvcrt
+    while True:
+        if msvcrt.kbhit():
+            key = msvcrt.getch()
+            if key == b'\xe0':  # Teclas especiales
+                key = msvcrt.getch()
+                if key == b'H':  # Flecha arriba
+                    seleccion = (seleccion - 1) % len(opciones)
+                    mostrar_menu()
+                elif key == b'P':  # Flecha abajo
+                    seleccion = (seleccion + 1) % len(opciones)
+                    mostrar_menu()
+            elif key == b'\r':  # Enter
+                break
+            elif key in [b'1', b'2']:
+                seleccion = int(key) - 49  # ASCII '1' = 49
+                break
+    
+    opcion_elegida = opciones[seleccion]
+    print(f"\n  ✓ Modelo seleccionado: {opcion_elegida['nombre']}\n")
 
     torch_path = os.path.join(base_dir, "../models/full_fp32")
     onnx_path  = os.path.join(base_dir, "../models/onnx_int8_dynamic")
 
-    if opcion == "1":
+    if opcion_elegida['tipo'] == "pytorch":
         # PyTorch
         import torch
         from transformers import T5Tokenizer, T5ForConditionalGeneration
@@ -129,25 +221,40 @@ def elegir_modelo(base_dir: str):
 
 
 def main():
+    # Limpiar pantalla
+    os.system('cls' if os.name == 'nt' else 'clear')
+    
+    # Mostrar banner
+    mostrar_banner()
+    
     base_dir = os.path.dirname(os.path.abspath(__file__))
     nombre_modelo, generar = elegir_modelo(base_dir)
 
-    print(f"\n✅ Modelo seleccionado: {nombre_modelo}")
-    print("Escribe 'salir' en cualquier línea para terminar.")
+    print("\n╔═══════════════════════════════════════════════════════════════════════════╗")
+    print("║                           GENERADOR ACTIVO                                ║")
+    print("╚═══════════════════════════════════════════════════════════════════════════╝")
 
     while True:
         entrada = leer_entrada_multilinea()
         if entrada == "__SALIR__":
-            print("🚪 Saliendo.")
+            print("\n╭─────────────────────────────────────────────────────────────────────╮")
+            print("│  👋 Gracias por usar CODE-2. ¡Hasta pronto!                        │")
+            print("╰─────────────────────────────────────────────────────────────────────╯\n")
             break
         if not entrada:
-            print("⚠️ Entrada vacía. Intenta de nuevo.")
+            print("\n  ⚠️  Entrada vacía. Por favor, introduce una instrucción.\n")
             continue
 
+        print("\n  ⚙️  Generando código ensamblador...\n")
         salida, dt = generar(entrada)
-        print("\n🖥️ CODE-2 ensamblado:")
+        
+        print("╭─────────────────────────────────────────────────────────────────────╮")
+        print("│  📦 CÓDIGO ENSAMBLADOR GENERADO                                    │")
+        print("╰─────────────────────────────────────────────────────────────────────╯\n")
         print(salida)
-        print(f"\n⏱️ Tiempo de inferencia: {dt:.4f} s")
+        print(f"\n╭─────────────────────────────────────────────────────────────────────╮")
+        print(f"│  ⏱️  Tiempo de inferencia: {dt:.4f} segundos                        ")
+        print("╰─────────────────────────────────────────────────────────────────────╯")
 
 
 if __name__ == "__main__":

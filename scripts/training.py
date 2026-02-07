@@ -49,6 +49,11 @@ def main():
     ap.add_argument("--max_input_len", type=int, default=402)
     ap.add_argument("--max_output_len", type=int, default=511)
     ap.add_argument("--fp16", action="store_true", default=True)
+    ap.add_argument(
+        "--preserve_newlines",
+        action="store_true",
+        help="Preserva saltos de linea reemplazandolos por SALTO antes de tokenizar",
+    )
 
     args = ap.parse_args()
     set_seed(args.seed)
@@ -56,11 +61,10 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     print("🧠 Cargando tokenizer desde:", args.model_path)
-    tokenizer = T5Tokenizer.from_pretrained(args.model_path)
+    tokenizer = T5Tokenizer.from_pretrained(args.model_path, legacy=False)
 
-    # token especial salto de línea (si no existe ya)
-    if "\n" not in tokenizer.get_vocab():
-        tokenizer.add_special_tokens({"additional_special_tokens": ["\n"]})
+    if args.preserve_newlines and "SALTO" not in tokenizer.get_vocab():
+        tokenizer.add_special_tokens({"additional_special_tokens": ["SALTO"]})
 
     print("🧠 Cargando modelo desde:", args.model_path)
     model = T5ForConditionalGeneration.from_pretrained(args.model_path).to(device)
@@ -73,14 +77,20 @@ def main():
     )
 
     def preprocess(examples):
+        inputs = examples["input"]
+        outputs = examples["output"]
+        if args.preserve_newlines:
+            inputs = [text.replace("\n", " SALTO ") for text in inputs]
+            outputs = [text.replace("\n", " SALTO ") for text in outputs]
+
         x = tokenizer(
-            examples["input"],
+            inputs,
             max_length=args.max_input_len,
             truncation=True,
             padding="max_length",
         )
         y = tokenizer(
-            examples["output"],
+            outputs,
             max_length=args.max_output_len,
             truncation=True,
             padding="max_length",

@@ -1,0 +1,19 @@
+Distribución del dataset sintético por tipo de instrucción y complejidad de secuencias
+
+Seccion,Categoria,Conteo
+Ejemplos por longitud,1,1252
+Ejemplos por longitud,2,1201
+Ejemplos por longitud,3,2360
+Ejemplos por longitud,4,3696
+Ejemplos por longitud,5,4953
+Ejemplos por longitud,6,6201
+Ejemplos por longitud,7,6316
+Ejemplos por longitud,8,4904
+Ejemplos por longitud,9,3772
+Ejemplos por longitud,10,2515
+Ejemplos por longitud,11,1230
+Lineas por tipo,ADDS,57520
+Lineas por tipo,SUBS,57479
+Lineas por tipo,ST,54936
+Lineas por tipo,LD,54747
+Lineas por tipo,Error,18879
