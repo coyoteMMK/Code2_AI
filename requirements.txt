@@ -1,13 +1,14 @@
 # =========================
 # Core (T5 / Transformers)
 # =========================
-torch==2.9.1
+torch==2.9.1+cu121
 transformers==4.57.6
 tokenizers==0.22.2
 huggingface-hub==0.36.0
 sentencepiece==0.2.1
 safetensors==0.7.0
 accelerate==0.34.2
+peft==0.15.0
 
 # =========================
 # Data / metrics
@@ -19,6 +20,8 @@ datasets==2.21.0
 evaluate==0.4.6
 sacrebleu==2.6.0
 rouge-score==0.1.2
+nltk==3.9.1
+scikit-learn==1.8.0
 
 # =========================
 # ONNX / Optimum
@@ -28,6 +31,12 @@ onnxruntime==1.23.2
 optimum==2.1.0
 # (opcional) solo si tu proyecto lo usa explícitamente:
 optimum-onnx==0.1.0
+
+# =========================
+# Hyperparameter Optimization
+# =========================
+optuna==3.7.0
+optuna-dashboard==0.17.2
 
 # =========================
 # UI (optional)

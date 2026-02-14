@@ -9,54 +9,54 @@ REGISTROS = [f"r{i:X}" for i in range(16)]
 
 PLANTILLAS = {
     "LD": [
-        "Carga el valor de la dirección {} en {}",
-        "Lee la dirección {} y guárdala en {}",
-        "Trae el contenido de {} y ponlo en {}",
-        "Copia lo que hay en {} a {}",
-        "Obtén el dato de {} y almacénalo en {}",
-        "Toma el valor de {} y colócalo en {}",
+        "Carga el valor de la dirección {} en r{}",
+        "Lee la dirección {} y guárdala en r{}",
+        "Trae el contenido de {} y ponlo en r{}",
+        "Copia lo que hay en {} a r{}",
+        "Obtén el dato de {} y almacénalo en r{}",
+        "Toma el valor de {} y colócalo en r{}",
         "Carga la dirección {} en el registro {}",
         "Lee {} y almacénalo en el registro {}",
         "Trae el dato de {} y ponlo en registro {}"
     ],
     "ST": [
-        "Guarda el contenido de {} en la dirección {}",
-        "Almacena el valor de {} en {}",
-        "Escribe {} en la memoria {}",
-        "Coloca lo que hay en {} dentro de {}",
-        "Pon el dato de {} en la dirección {}",
-        "Graba el valor de {} en la posición de memoria {}",
+        "Guarda el contenido de r{} en la dirección {}",
+        "Almacena el valor de r{} en {}",
+        "Escribe r{} en la memoria {}",
+        "Coloca lo que hay en r{} dentro de {}",
+        "Pon el dato de r{} en la dirección {}",
+        "Graba el valor de r{} en la posición de memoria {}",
         "Guarda el registro {} en la dirección {}",
-        "Escribe el contenido de {} en memoria {}",
+        "Escribe el contenido del registro {} en memoria {}",
         "Almacena el registro {} en la posición {}"
     ],
     "ADDS": [
-        "Suma {} y {} y guarda el resultado en {}",
-        "Añade {} a {} y almacena en {}",
-        "Calcula la suma de {} y {} y pon el resultado en {}",
-        "Combina {} con {} y guarda en {}",
-        "Haz la suma entre {} y {} y guárdala en {}",
-        "Une {} y {} y deja el resultado en {}",
+        "Suma r{} y r{} y guarda el resultado en r{}",
+        "Añade r{} a r{} y almacena en r{}",
+        "Calcula la suma de r{} y r{} y pon el resultado en r{}",
+        "Combina r{} con r{} y guarda en r{}",
+        "Haz la suma entre r{} y r{} y guárdala en r{}",
+        "Une r{} y r{} y deja el resultado en r{}",
         "Suma el registro {} al registro {} y guarda en registro {}",
-        "Suma {} al {} y almacena el resultado en {}",
-        "Añade el registro {} con el registro {} y pon en {}",
-        "Calcula {} más {} y guarda en el registro {}",
-        "Combina registro {} con registro {} y deja en {}",
+        "Suma r{} al r{} y almacena el resultado en r{}",
+        "Añade el registro {} con el registro {} y pon en r{}",
+        "Calcula r{} más r{} y guarda en el registro {}",
+        "Combina registro {} con registro {} y deja en r{}",
         "Suma la registro {} a la registro {} y guarda en registro {}"
     ],
     "SUBS": [
-        "Resta {} y {} y guárdalo en {}",
-        "Calcula {} menos {} y guarda en {}",
-        "Sustrae {} de {} y pon el resultado en {}",
-        "Haz {} - {} y almacena en {}",
-        "Obtén la diferencia entre {} y {} y guarda en {}",
-        "Quita {} a {} y almacénalo en {}",
+        "Resta r{} y r{} y guárdalo en r{}",
+        "Calcula r{} menos r{} y guarda en r{}",
+        "Sustrae r{} de r{} y pon el resultado en r{}",
+        "Haz r{} - r{} y almacena en r{}",
+        "Obtén la diferencia entre r{} y r{} y guarda en r{}",
+        "Quita r{} a r{} y almacénalo en r{}",
         "Resta el registro {} del registro {} y guarda en registro {}",
-        "Sustrae {} de {} y almacena en {}",
-        "Quita el registro {} a {} y pon en {}",
-        "Calcula {} menos {} y guarda en el registro {}",
-        "Obtén la diferencia de {} y {} y deja en {}",
-        "Resta registro {} de registro {} y almacena en {}"
+        "Sustrae r{} de r{} y almacena en r{}",
+        "Quita el registro {} a r{} y pon en r{}",
+        "Calcula r{} menos r{} y guarda en el registro {}",
+        "Obtén la diferencia de r{} y r{} y deja en r{}",
+        "Resta registro {} de registro {} y almacena en r{}"
     ]
 }
 
@@ -195,7 +195,7 @@ def generar_par():
 
     return nl, code2
 
-def generar_bloque(max_instrucciones=11):
+def generar_bloque(max_instrucciones=11, preserve_newlines=False):
     # distribución parecida a la que usas (más probabilidad en longitudes medias-altas)
     n = random.choices(list(range(1, max_instrucciones + 1)), weights=[1,1,2,3,4,5,5,4,3,2,1][:max_instrucciones])[0]
     lineas_nl, lineas_code2 = [], []
@@ -204,19 +204,28 @@ def generar_bloque(max_instrucciones=11):
         lineas_nl.append(nl)
         lineas_code2.append(code)
 
+    input_text = "\n".join(lineas_nl)
+    output_text = "\n".join(lineas_code2)
+    if preserve_newlines:
+        input_text = input_text.replace("\n", " SALTO ")
+        output_text = output_text.replace("\n", " SALTO ")
+
     return {
         "task": "nl_to_code2",
-        "input": "\n".join(lineas_nl),
-        "output": "\n".join(lineas_code2),
+        "input": input_text,
+        "output": output_text,
     }
 
-def generar_dataset(n_ejemplos, max_instrucciones=11):
+def generar_dataset(n_ejemplos, max_instrucciones=11, preserve_newlines=False):
     dataset = []
     seen = set()
     intentos = 0
     while len(dataset) < n_ejemplos:
         intentos += 1
-        ex = generar_bloque(max_instrucciones=max_instrucciones)
+        ex = generar_bloque(
+            max_instrucciones=max_instrucciones,
+            preserve_newlines=preserve_newlines,
+        )
         key = ex["input"] + "|" + ex["output"]
         if key not in seen:
             seen.add(key)
@@ -242,14 +251,19 @@ def max_lens(examples):
 # ======= Main =======
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out_dir", default="../datasource", help="Carpeta de salida")
-    ap.add_argument("--n_total", type=int, default=50000)
+    ap.add_argument("--out_dir", default="../datasource_18K", help="Carpeta de salida")
+    ap.add_argument("--n_total", type=int, default=18000, help="Número total de ejemplos a generar")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--max_instr", type=int, default=11)
-    ap.add_argument("--train_ratio", type=float, default=0.80)
-    ap.add_argument("--valid_ratio", type=float, default=0.20)  # test opcional
-    ap.add_argument("--test_ratio", type=float, default=0.00)
-    ap.add_argument("--test_n", type=int, default=2000, help="Numero fijo de ejemplos para test.json")
+    ap.add_argument("--train_ratio", type=float, default=0.70)
+    ap.add_argument("--valid_ratio", type=float, default=0.20)  
+    ap.add_argument("--test_ratio", type=float, default=0.10)
+    ap.add_argument("--test_n", type=int, default=0, help="Tamaño fijo de test (0 para usar test_ratio)")
+    ap.add_argument(
+        "--preserve_newlines",
+        action="store_true",
+        help="Reemplaza saltos de linea por SALTO en input/output",
+    )
     args = ap.parse_args()
 
     if args.test_n > 0:
@@ -264,7 +278,11 @@ def main():
     print("\n⚙️ INICIANDO GENERADOR")
     time.sleep(0.2)
 
-    dataset = generar_dataset(args.n_total, max_instrucciones=args.max_instr)
+    dataset = generar_dataset(
+        args.n_total,
+        max_instrucciones=args.max_instr,
+        preserve_newlines=args.preserve_newlines,
+    )
     random.shuffle(dataset)
 
     max_in, max_out, max_in_lines, max_out_lines = max_lens(dataset)

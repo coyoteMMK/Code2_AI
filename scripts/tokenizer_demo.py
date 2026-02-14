@@ -10,14 +10,14 @@ def main():
     
     ap.add_argument(
         "--model_path",
-        default="models/full_fp32",
-        help="Ruta al modelo/tokenizador (por defecto: models/full_fp32)"
+        default="t5-small",
+        help="Ruta al modelo/tokenizador (por defecto: t5-small)"
     )
     
     ap.add_argument(
         "--text",
         type=str,
-        required=True,
+        default="sustrae d de 7 y almacena en 4\nGraba El Valor De D En La Posición De Memoria A7\ncoloca lo que hay en 2 dentro de f\nGraba el valor de 1 en la posición de memoria 7\nCalcula a más 5 y guarda en el registro 4\nCALCULA 0 MENOS 3 Y GUARDA EN EL REGISTRO 7\ncarga la dirección 53 en el registro e\nGuarda el registro a en la dirección 0\nSuma el registro 5 al registro A y guarda en registro 4",
         help="Texto a tokenizar"
     )
     

@@ -30,13 +30,13 @@ def main():
     # 🔹 CLAVE: modelo inicial (HF o ruta local)
     ap.add_argument(
         "--model_path",
-        default="models/full_fp32",
+        default="t5-small",
         help="Modelo base: nombre HF (t5-small) o ruta local entrenada"
     )
 
     ap.add_argument("--train_json", default="data/train.json")
     ap.add_argument("--valid_json", default="data/valid.json")
-    ap.add_argument("--save_dir", default="models/full_fp32_extended")
+    ap.add_argument("--save_dir", default="models/full_fp32")
     ap.add_argument("--seed", type=int, default=42)
 
     # hiperparámetros finales
