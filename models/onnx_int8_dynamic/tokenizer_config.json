@@ -826,16 +826,15 @@
       "special": true
     },
     "32100": {
-      "content": "\n",
+      "content": "SALTO",
       "lstrip": false,
-      "normalized": false,
+      "normalized": true,
       "rstrip": false,
       "single_word": false,
-      "special": true
+      "special": false
     }
   },
   "additional_special_tokens": [
-    "\n",
     "<extra_id_0>",
     "<extra_id_1>",
     "<extra_id_2>",
@@ -941,7 +940,7 @@
   "eos_token": "</s>",
   "extra_ids": 100,
   "extra_special_tokens": {},
-  "legacy": true,
+  "legacy": false,
   "model_max_length": 512,
   "pad_token": "<pad>",
   "sp_model_kwargs": {},

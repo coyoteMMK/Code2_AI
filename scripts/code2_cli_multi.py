@@ -9,15 +9,15 @@ def mostrar_banner():
     banner = r"""
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                                                                           ║
-║   ██████╗ ██████╗ ██████╗ ███████╗    ██████╗                           ║
-║  ██╔════╝██╔═══██╗██╔══██╗██╔════╝    ╚════██╗                          ║
-║  ██║     ██║   ██║██║  ██║█████╗█████╗ █████╔╝                          ║
-║  ██║     ██║   ██║██║  ██║██╔══╝╚════╝██╔═══╝                           ║
-║  ╚██████╗╚██████╔╝██████╔╝███████╗    ███████╗                          ║
-║   ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝    ╚══════╝                          ║
+║                 ██████╗ ██████╗ ██████╗ ███████╗    ██████╗               ║
+║                ██╔════╝██╔═══██╗██╔══██╗██╔════╝    ╚════██╗              ║
+║                ██║     ██║   ██║██║  ██║█████╗█████╗ █████╔╝              ║
+║                ██║     ██║   ██║██║  ██║██╔══╝╚════╝██╔═══╝               ║
+║                ╚██████╗╚██████╔╝██████╔╝███████╗    ███████╗              ║
+║                 ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝    ╚══════╝              ║
 ║                                                                           ║
 ║              Natural Language to Assembly Code Generator                  ║
-║                         Version 1.0.0 - 2025                             ║
+║                         Version 1.0.0 - 2025                              ║
 ║                                                                           ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
     """
@@ -44,31 +44,24 @@ def leer_tecla():
 
 
 def limpiar_salida(texto: str) -> str:
-    # Convierte '\n' literal a salto real
-    texto = texto.replace("\\n", "\n")
-
+    # Convierte SALTO de vuelta a saltos de línea reales
+    texto = texto.replace(" SALTO ", "\n")
+    
     # Quita tokens especiales típicos si aparecen en texto
     texto = re.sub(r"<pad>|</s>|<s>", "", texto)
-
-    # Quita espacios antes/después del salto de línea
-    texto = re.sub(r"[ \t]+\n", "\n", texto)
-    texto = re.sub(r"\n[ \t]+", "\n", texto)
 
     # Normaliza espacios múltiples
     texto = re.sub(r" +", " ", texto)
 
-    # Quita indentación al principio de cada línea
-    lineas = texto.splitlines()
-    lineas = [ln.lstrip() for ln in lineas]
-
-    return "\n".join(lineas).strip()
+    # Quita espacios antes/después al principio y final
+    return texto.strip()
 
 
 def leer_entrada_multilinea() -> str:
-    print("\n╭─────────────────────────────────────────────────────────────────────╮")
-    print("│  📝 Instrucción en Lenguaje Natural                                │")
+    print("\n╭─────────────────────────────────────────────────────────────────────────╮")
+    print("│  Instrucción en Lenguaje Natural                                        │")
     print("│  (Presiona ENTER en línea vacía para ejecutar, o 'salir' para terminar) │")
-    print("╰─────────────────────────────────────────────────────────────────────╯")
+    print("╰─────────────────────────────────────────────────────────────────────────╯")
     print("\n> ", end="")
     lineas = []
     while True:
@@ -80,7 +73,10 @@ def leer_entrada_multilinea() -> str:
         lineas.append(linea)
         if linea:  # Si hay más texto, mostrar el prompt
             print("> ", end="")
-    return "\n".join(lineas).strip()
+    entrada = "\n".join(lineas).strip()
+    # Convertir saltos de línea reales a SALTO para el modelo
+    entrada = entrada.replace("\n", " SALTO ")
+    return entrada
 
 
 def elegir_modelo(base_dir: str):
@@ -88,13 +84,13 @@ def elegir_modelo(base_dir: str):
         {
             "nombre": "Full Fine-Tuning (PyTorch FP32)",
             "descripcion": "Modelo completo en precisión FP32 - Mayor precisión",
-            "ruta": "models/full_fp32",
+            "ruta": "../3.train_final/results_Full_optimizado_final",
             "tipo": "pytorch"
         },
         {
             "nombre": "ONNX INT8 Dynamic Quantization",
             "descripcion": "Modelo optimizado INT8 - Mayor velocidad y eficiencia",
-            "ruta": "models/onnx_int8_dynamic",
+            "ruta": "../5.cuantizacion/t5_onnx_int8_dynamic",
             "tipo": "onnx"
         }
     ]
@@ -105,7 +101,7 @@ def elegir_modelo(base_dir: str):
         os.system('cls' if os.name == 'nt' else 'clear')
         mostrar_banner()
         print("\n╔═══════════════════════════════════════════════════════════════════════════╗")
-        print("║                    SELECCIÓN DE MODELO Y CONFIGURACIÓN                   ║")
+        print("║                    SELECCIÓN DE MODELO Y CONFIGURACIÓN                    ║")
         print("╚═══════════════════════════════════════════════════════════════════════════╝\n")
         print("  Use las flechas ↑↓ para navegar y ENTER para seleccionar:\n")
         
@@ -140,20 +136,19 @@ def elegir_modelo(base_dir: str):
                 break
     
     opcion_elegida = opciones[seleccion]
-    print(f"\n  ✓ Modelo seleccionado: {opcion_elegida['nombre']}\n")
+    print(f"\n  [OK] Modelo seleccionado: {opcion_elegida['nombre']}\n")
 
-    torch_path = os.path.join(base_dir, "../models/full_fp32")
-    onnx_path  = os.path.join(base_dir, "../models/onnx_int8_dynamic")
+    modelo_path = os.path.join(base_dir, opcion_elegida['ruta'])
 
     if opcion_elegida['tipo'] == "pytorch":
         # PyTorch
         import torch
         from transformers import T5Tokenizer, T5ForConditionalGeneration
 
-        if not os.path.isdir(torch_path):
-            raise FileNotFoundError(f"No encuentro la carpeta del modelo PyTorch: {torch_path}")
+        if not os.path.isdir(modelo_path):
+            raise FileNotFoundError(f"No encuentro la carpeta del modelo PyTorch: {modelo_path}")
 
-        tokenizer = T5Tokenizer.from_pretrained(torch_path)
+        tokenizer = T5Tokenizer.from_pretrained(modelo_path)
 
         # Si por lo que sea no está guardado el token especial, lo añadimos (no pasa nada si ya está)
         try:
@@ -162,7 +157,7 @@ def elegir_modelo(base_dir: str):
             pass
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = T5ForConditionalGeneration.from_pretrained(torch_path).to(device)
+        model = T5ForConditionalGeneration.from_pretrained(modelo_path).to(device)
         model.eval()
 
         def generar(texto_entrada: str):
@@ -174,9 +169,12 @@ def elegir_modelo(base_dir: str):
                 out_ids = model.generate(
                     **inputs,
                     max_length=512,
-                    num_beams=4,        # precisión > creatividad
-                    do_sample=False,
+                    num_beams=1,
+                    early_stopping=True,
                     pad_token_id=tokenizer.pad_token_id,
+                    do_sample=True,
+                    temperature=0.4,
+                    top_p=0.8,
                 )
             t1 = time.perf_counter()
 
@@ -190,17 +188,17 @@ def elegir_modelo(base_dir: str):
         from transformers import T5Tokenizer
         from optimum.onnxruntime import ORTModelForSeq2SeqLM
 
-        if not os.path.isdir(onnx_path):
-            raise FileNotFoundError(f"No encuentro la carpeta del modelo ONNX INT8: {onnx_path}")
+        if not os.path.isdir(modelo_path):
+            raise FileNotFoundError(f"No encuentro la carpeta del modelo ONNX INT8: {modelo_path}")
 
-        tokenizer = T5Tokenizer.from_pretrained(onnx_path)
+        tokenizer = T5Tokenizer.from_pretrained(modelo_path)
 
         try:
             tokenizer.add_special_tokens({"additional_special_tokens": ["\n"]})
         except Exception:
             pass
 
-        model = ORTModelForSeq2SeqLM.from_pretrained(onnx_path)
+        model = ORTModelForSeq2SeqLM.from_pretrained(modelo_path)
 
         def generar(texto_entrada: str):
             inputs = tokenizer(texto_entrada, return_tensors="pt", truncation=True, padding=True)
@@ -209,8 +207,11 @@ def elegir_modelo(base_dir: str):
             out_ids = model.generate(
                 **inputs,
                 max_length=512,
-                num_beams=4,
-                do_sample=False,
+                num_beams=1,
+                early_stopping=True,
+                do_sample=True,
+                temperature=0.4,
+                top_p=0.8,
             )
             t1 = time.perf_counter()
 
@@ -238,22 +239,22 @@ def main():
         entrada = leer_entrada_multilinea()
         if entrada == "__SALIR__":
             print("\n╭─────────────────────────────────────────────────────────────────────╮")
-            print("│  👋 Gracias por usar CODE-2. ¡Hasta pronto!                        │")
+            print("│  Gracias por usar CODE-2. ¡Hasta pronto!                            │")
             print("╰─────────────────────────────────────────────────────────────────────╯\n")
             break
         if not entrada:
-            print("\n  ⚠️  Entrada vacía. Por favor, introduce una instrucción.\n")
+            print("\n  Entrada vacía. Por favor, introduce una instrucción.\n")
             continue
 
-        print("\n  ⚙️  Generando código ensamblador...\n")
+        print("\n  Generando código ensamblador...\n")
         salida, dt = generar(entrada)
         
         print("╭─────────────────────────────────────────────────────────────────────╮")
-        print("│  📦 CÓDIGO ENSAMBLADOR GENERADO                                    │")
+        print("│  CÓDIGO ENSAMBLADOR GENERADO                                        │")
         print("╰─────────────────────────────────────────────────────────────────────╯\n")
         print(salida)
         print(f"\n╭─────────────────────────────────────────────────────────────────────╮")
-        print(f"│  ⏱️  Tiempo de inferencia: {dt:.4f} segundos                        ")
+        print(f"│  Tiempo de inferencia: {dt:.4f} segundos                              |")
         print("╰─────────────────────────────────────────────────────────────────────╯")
 
 

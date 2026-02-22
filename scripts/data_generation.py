@@ -98,7 +98,7 @@ def direccion_invalida():
 
 def generar_par():
     tipo = random.choice(["LD", "ST", "ADDS", "SUBS"])
-    es_error = random.random() < 0.1
+    es_error = random.random() < 0.2  # 20% de ejemplos con error
     error_tipo = random.choice(["reg", "dir", "ambos"]) if es_error else "ninguno"
 
     if tipo in ["ADDS", "SUBS"]:
@@ -159,7 +159,7 @@ def generar_par():
             d = direccion.upper().rjust(4, "0")
             v = d[-2:]
             rd_base = d[:-2] or "00"
-            code2 = f"LD {reg},[rD+H'{v}']  ; rD = {rd_base}00"
+            code2 = f"LD {reg},[rD+H'{v}'] ; rD = {rd_base}00"
 
     else:  # ST
         reg = registro_invalido() if error_tipo in ["reg", "ambos"] else random.choice(REGISTROS)
@@ -191,7 +191,7 @@ def generar_par():
             d = direccion.upper().rjust(4, "0")
             v = d[-2:]
             rd_base = d[:-2] or "00"
-            code2 = f"ST [rD+H'{v}'],{reg}  ; rD = {rd_base}00"
+            code2 = f"ST [rD+H'{v}'],{reg} ; rD = {rd_base}00"
 
     return nl, code2
 
@@ -232,7 +232,7 @@ def generar_dataset(n_ejemplos, max_instrucciones=11, preserve_newlines=False):
             dataset.append(ex)
         if len(dataset) % 5000 == 0 and len(dataset) != 0:
             print(f"▌ Progreso: {len(dataset)}/{n_ejemplos} ejemplos únicos...")
-    print(f"🔍 Intentos totales: {intentos}")
+    print(f"Intentos totales: {intentos}")
     return dataset
 
 def max_lens(examples):
@@ -251,8 +251,8 @@ def max_lens(examples):
 # ======= Main =======
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out_dir", default="../datasource_18K", help="Carpeta de salida")
-    ap.add_argument("--n_total", type=int, default=18000, help="Número total de ejemplos a generar")
+    ap.add_argument("--out_dir", default="./datasource_36k", help="Carpeta de salida")
+    ap.add_argument("--n_total", type=int, default=36000, help="Número total de ejemplos a generar")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--max_instr", type=int, default=11)
     ap.add_argument("--train_ratio", type=float, default=0.70)
@@ -275,7 +275,7 @@ def main():
 
     random.seed(args.seed)
 
-    print("\n⚙️ INICIANDO GENERADOR")
+    print("\nINICIANDO GENERADOR")
     time.sleep(0.2)
 
     dataset = generar_dataset(
@@ -286,7 +286,7 @@ def main():
     random.shuffle(dataset)
 
     max_in, max_out, max_in_lines, max_out_lines = max_lens(dataset)
-    print("\n📏 Longitudes máximas en el dataset (antes del split):")
+    print("\nLongitudes máximas en el dataset (antes del split):")
     print(f"   Input : {max_in} caracteres | {max_in_lines} líneas")
     print(f"   Output: {max_out} caracteres | {max_out_lines} líneas")
 
@@ -320,7 +320,7 @@ def main():
         with open(f"{args.out_dir}/test.json", "w", encoding="utf-8") as f:
             json.dump(test, f, indent=2, ensure_ascii=False)
 
-    print("\n✅ Dataset generado:")
+    print("\nDataset generado:")
     print(f"   Train: {len(train)} -> {args.out_dir}/train.json")
     print(f"   Valid: {len(valid)} -> {args.out_dir}/valid.json")
     if n_test > 0:
