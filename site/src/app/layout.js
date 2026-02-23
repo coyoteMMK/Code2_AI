@@ -14,6 +14,9 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "Code2 AI By Santos Bernabeu",
   description: "Convertidor de instrucciones en código ensamblador medianrte IA",
+  icons: {
+    icon: "/code2-logo.svg",
+  },
 };
 
 export default function RootLayout({ children }) {

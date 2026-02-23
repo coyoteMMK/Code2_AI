@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Client } from "@gradio/client";
 
 export default function Page() {
@@ -17,8 +17,13 @@ export default function Page() {
     },
   ]);
 
+  const textareaRef = useRef(null);
+  const chatEndRef = useRef(null);
+
   const [modelChoice, setModelChoice] = useState("onnx");
-  const [beams, setBeams] = useState(4);
+  const [beams, setBeams] = useState(1);
+  const [temperature, setTemperature] = useState(0.2);
+  const [topP, setTopP] = useState(0.6);
 
   const SPACE_ID = useMemo(() => "coyoteMMK/Code2_AI", []);
   const ENDPOINT = useMemo(() => "/generar", []);
@@ -39,6 +44,17 @@ export default function Page() {
       return () => clearInterval(interval);
     }
   }, [fullOutput, displayedOutput, loading]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [input]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
 
   async function run() {
     if (!input.trim()) return;
@@ -64,7 +80,13 @@ export default function Page() {
       const modelo_sel =
         modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más pesado)";
 
-      const result = await client.predict(ENDPOINT, [input, modelo_sel, beams]);
+      const result = await client.predict(ENDPOINT, [
+        input,
+        modelo_sel,
+        beams,
+        temperature,
+        topP,
+      ]);
 
       const t1 = performance.now();
 
@@ -107,29 +129,94 @@ export default function Page() {
     }
   }
 
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && e.ctrlKey) {
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey) {
+      e.preventDefault();
       run();
     }
   };
 
   return (
-    <main className="flex h-screen flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-slate-100">
+    <main className="relative flex h-screen flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-stone-900 text-slate-100">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(75%_60%_at_20%_0%,rgba(148,163,184,0.12),transparent_70%)]" />
       {/* Header */}
-      <div className="border-b border-purple-500/30 bg-black/50 px-6 py-4 backdrop-blur">
-        <div className="mx-auto max-w-4xl">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            ✨ Code-2 Translator
-          </h1>
-          <p className="mt-1 text-sm text-slate-400">
-            Convierte instrucciones en lenguaje natural a ensamblador CODE-2
-          </p>
+      <div className="relative border-b border-white/10 bg-black/40 px-6 py-4 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-slate-800/60 px-3 py-1.5">
+            <span className="text-xs font-medium text-slate-300">Modelo</span>
+            <select
+              className="rounded-full bg-slate-900/60 px-2 py-1 text-xs text-slate-100 outline-none"
+              value={modelChoice}
+              onChange={(e) => setModelChoice(e.target.value)}
+              disabled={loading}
+            >
+              <option value="onnx">ONNX INT8 (rapido)</option>
+              <option value="fp32">Full FP32 (preciso)</option>
+            </select>
+          </div>
+
+          <div className="flex min-w-[200px] flex-1 items-center justify-center">
+            <div className="flex items-center gap-3">
+              <img
+                src="/code2-logo.svg"
+                alt="Code-2"
+                className="h-8 w-8"
+              />
+              <div>
+                <h1 className="text-xl font-semibold text-slate-100">Code-2 Translator</h1>
+                <p className="text-sm text-slate-400">
+                  Traduce lenguaje natural a ensamblador CODE-2
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-slate-800/60 px-3 py-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium text-slate-300">Beams</span>
+              <input
+                className="w-14 rounded-full bg-slate-900/60 px-2 py-1 text-[11px] text-slate-100 outline-none"
+                type="number"
+                min={1}
+                max={8}
+                value={beams}
+                onChange={(e) => setBeams(parseInt(e.target.value || "1", 10))}
+                disabled={loading}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium text-slate-300">Temp</span>
+              <input
+                className="w-16 rounded-full bg-slate-900/60 px-2 py-1 text-[11px] text-slate-100 outline-none"
+                type="number"
+                min={0.1}
+                max={2.0}
+                step={0.1}
+                value={temperature}
+                onChange={(e) => setTemperature(parseFloat(e.target.value || "0.2"))}
+                disabled={loading}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium text-slate-300">Top-p</span>
+              <input
+                className="w-16 rounded-full bg-slate-900/60 px-2 py-1 text-[11px] text-slate-100 outline-none"
+                type="number"
+                min={0.1}
+                max={1.0}
+                step={0.1}
+                value={topP}
+                onChange={(e) => setTopP(parseFloat(e.target.value || "0.6"))}
+                disabled={loading}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto max-w-4xl space-y-4">
+      <div className="relative flex-1 overflow-y-auto px-6 py-6 soft-scroll">
+        <div className="mx-auto max-w-5xl space-y-4">
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -138,17 +225,17 @@ export default function Page() {
               <div
                 className={`max-w-2xl rounded-2xl px-5 py-3 ${
                   msg.type === "user"
-                    ? "bg-gradient-to-br from-purple-600 to-purple-700 text-white rounded-br-none"
+                    ? "bg-slate-700/80 text-slate-100 rounded-br-none"
                     : msg.isError
-                    ? "bg-red-900/40 border border-red-500/50 text-red-200 rounded-bl-none"
-                    : "bg-slate-800/80 border border-purple-500/30 text-slate-100 rounded-bl-none"
+                    ? "bg-rose-950/40 border border-rose-400/40 text-rose-100 rounded-bl-none"
+                    : "bg-slate-800/70 border border-white/10 text-slate-100 rounded-bl-none"
                 }`}
               >
-                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                <p className="whitespace-pre-wrap break-words text-base leading-relaxed">
                   {msg.content}
                 </p>
                 {msg.latency && (
-                  <p className="mt-2 text-xs text-slate-400">
+                  <p className="mt-2 text-sm text-slate-400">
                     ⏱ {msg.latency.toFixed(3)}s • {msg.model}
                   </p>
                 )}
@@ -158,67 +245,55 @@ export default function Page() {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="rounded-2xl rounded-bl-none bg-slate-800/80 border border-purple-500/30 px-5 py-3">
+              <div className="rounded-2xl rounded-bl-none bg-slate-800/70 border border-white/10 px-5 py-3">
                 <div className="flex gap-2">
-                  <div className="h-2 w-2 rounded-full bg-purple-400 animate-bounce" />
-                  <div className="h-2 w-2 rounded-full bg-purple-400 animate-bounce delay-100" />
-                  <div className="h-2 w-2 rounded-full bg-purple-400 animate-bounce delay-200" />
+                  <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" />
+                  <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce delay-100" />
+                  <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce delay-200" />
                 </div>
               </div>
             </div>
           )}
+          <div ref={chatEndRef} />
         </div>
       </div>
 
       {/* Settings & Input Bar */}
-      <div className="border-t border-purple-500/30 bg-black/50 px-6 py-4 backdrop-blur">
-        <div className="mx-auto max-w-4xl space-y-4">
-          {/* Controles */}
-          <div className="flex items-center gap-3 rounded-xl bg-slate-800/40 border border-purple-500/20 p-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-400">Modelo</span>
-              <select
-                className="rounded-lg bg-slate-700 border border-slate-600 px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
-                value={modelChoice}
-                onChange={(e) => setModelChoice(e.target.value)}
-                disabled={loading}
-              >
-                <option value="onnx">⚡ ONNX INT8 (Rápido)</option>
-                <option value="fp32">🎯 Full FP32 (Preciso)</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-400">Beams</span>
-              <input
-                className="w-16 rounded-lg bg-slate-700 border border-slate-600 px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500"
-                type="number"
-                min={1}
-                max={8}
-                value={beams}
-                onChange={(e) => setBeams(parseInt(e.target.value || "4", 10))}
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          {/* Input */}
-          <div className="flex gap-3">
+      <div className="relative px-6 py-4 mb-3">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex items-end gap-3 rounded-2xl border border-white/10 bg-slate-950/40 p-2">
             <textarea
-              className="flex-1 rounded-xl bg-slate-800 border border-purple-500/30 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500 resize-none max-h-24"
-              placeholder="Escribe tu instrucción aquí... (Ctrl + Enter para enviar)"
+              ref={textareaRef}
+              className="soft-scroll flex-1 rounded-2xl bg-slate-900/70 border border-white/10 px-4 py-2 text-base leading-6 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-300 resize-none max-h-40 min-h-[44px] overflow-y-auto"
+              placeholder="Escribe tu instruccion aqui... (Enter para enviar, Shift/Ctrl+Enter para nueva linea)"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               disabled={loading}
-              rows={2}
+              rows={1}
             />
             <button
               onClick={run}
               disabled={loading || !input.trim()}
-              className="self-end rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 px-6 py-3 font-semibold text-white hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/50"
+              className="self-end rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none transition-colors"
             >
-              {loading ? "📝" : "Enviar"}
+              {loading ? (
+                "..."
+              ) : (
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              )}
             </button>
           </div>
         </div>
