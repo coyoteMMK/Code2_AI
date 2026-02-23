@@ -12,7 +12,7 @@ from nltk.translate.bleu_score import corpus_bleu, SmoothingFunction
 
 # Configuración
 MODEL_PATH = "./results_Full_optimizado"
-VALID_DATASET_PATH = "../datasource_36k/test.json"
+VALID_DATASET_PATH = "../datasource/test.json"
 SAMPLE_SIZE = 100
 BATCH_SIZE = 32
 

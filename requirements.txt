@@ -1,16 +1,15 @@
 # =========================
 # Core (T5 / Transformers)
 # =========================
-# Use the CUDA 12.1 wheel index so pip can resolve GPU builds.
---index-url https://download.pytorch.org/whl/cu121
-torch==2.5.1+cu121
+# NOTA: Instalar primero torch desde requirements-torch.txt
+# pip install -r requirements-torch.txt --index-url https://download.pytorch.org/whl/cu121
 transformers==4.57.6
 tokenizers==0.22.2
 huggingface-hub==0.36.0
 sentencepiece==0.2.1
 safetensors==0.7.0
-accelerate==0.34.2
-peft==0.15.0
+accelerate==1.12.0
+peft==0.18.1
 
 # =========================
 # Data / metrics
@@ -22,26 +21,170 @@ datasets==2.21.0
 evaluate==0.4.6
 sacrebleu==2.6.0
 rouge-score==0.1.2
-nltk==3.9.1
+nltk==3.9.2
 scikit-learn==1.8.0
+scipy==1.17.0
 
 # =========================
 # ONNX / Optimum
 # =========================
 onnx==1.20.1
 onnxruntime==1.23.2
+onnxruntime-gpu==1.24.1
 optimum==2.1.0
-# (opcional) solo si tu proyecto lo usa explícitamente:
 optimum-onnx==0.1.0
 
 # =========================
 # Hyperparameter Optimization
 # =========================
-optuna==3.7.0
-optuna-dashboard==0.17.2
+optuna==4.7.0
+optuna-dashboard==0.20.0
 
 # =========================
-# UI (optional)
+# UI (Gradio)
 # =========================
-gradio>=4.44,<7.0
-matplotlib>=3.8
+gradio==6.5.1
+gradio-client==2.0.3
+
+# =========================
+# Web / API
+# =========================
+fastapi==0.128.7
+starlette==0.52.1
+uvicorn==0.40.0
+httpx==0.28.1
+httpcore==1.0.9
+h11==0.16.0
+safehttpx==0.1.7
+aiohttp==3.13.3
+aiosignal==1.4.0
+aiohappyeyeballs==2.6.1
+aiofiles==24.1.0
+frozenlist==1.8.0
+multidict==6.7.1
+propcache==0.4.1
+yarl==1.22.0
+python-multipart==0.0.22
+
+# =========================
+# Visualization
+# =========================
+matplotlib==3.10.8
+pillow==12.1.0
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.61.1
+kiwisolver==1.4.9
+
+# =========================
+# Data Processing
+# =========================
+pyarrow==23.0.0
+dill==0.3.8
+multiprocess==0.70.16
+xxhash==3.6.0
+fsspec==2024.6.1
+filelock==3.20.3
+
+# =========================
+# Database
+# =========================
+alembic==1.18.4
+SQLAlchemy==2.0.46
+greenlet==3.3.1
+Mako==1.3.10
+
+# =========================
+# Utilities
+# =========================
+requests==2.32.5
+urllib3==2.6.3
+certifi==2026.1.4
+charset-normalizer==3.4.4
+idna==3.11
+click==8.3.1
+typer==0.21.1
+shellingham==1.5.4
+rich==14.3.2
+Pygments==2.19.2
+colorama==0.4.6
+coloredlogs==15.0.1
+colorlog==6.10.1
+humanfriendly==10.0
+tqdm==4.67.1
+portalocker==3.2.0
+psutil==7.2.2
+
+# =========================
+# Parsing / Templating
+# =========================
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+lxml==6.0.2
+markdown-it-py==4.0.0
+mdurl==0.1.2
+pyparsing==3.3.2
+regex==2026.1.15
+tomlkit==0.13.3
+
+# =========================
+# Validation / Serialization
+# =========================
+pydantic==2.12.5
+pydantic-core==2.41.5
+annotated-types==0.7.0
+annotated-doc==0.0.4
+typing-extensions==4.15.0
+typing-inspection==0.4.2
+
+# =========================
+# Google / Protobuf
+# =========================
+absl-py==2.4.0
+protobuf==6.33.5
+flatbuffers==25.12.19
+ml-dtypes==0.5.4
+
+# =========================
+# Media Processing
+# =========================
+ffmpy==1.0.0
+pydub==0.25.1
+brotli==1.2.0
+
+# =========================
+# Threading / Async
+# =========================
+anyio==4.12.1
+joblib==1.5.3
+threadpoolctl==3.6.0
+
+# =========================
+# Python Tools
+# =========================
+setuptools==82.0.0
+packaging==26.0
+python-dateutil==2.9.0.post0
+pytz==2025.2
+tzdata==2025.3
+six==1.17.0
+attrs==25.4.0
+orjson==3.11.7
+PyYAML==6.0.3
+tabulate==0.9.0
+semantic-version==2.10.0
+
+# =========================
+# Windows Specific
+# =========================
+pywin32==311
+pyreadline3==3.5.4
+
+# =========================
+# Other
+# =========================
+bottle==0.13.4
+groovy==0.1.2
+networkx==3.6.1
+sympy==1.13.1
+mpmath==1.3.0

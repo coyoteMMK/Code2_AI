@@ -251,7 +251,7 @@ def max_lens(examples):
 # ======= Main =======
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out_dir", default="./datasource_36k", help="Carpeta de salida")
+    ap.add_argument("--out_dir", default="../datasource", help="Carpeta de salida")
     ap.add_argument("--n_total", type=int, default=36000, help="Número total de ejemplos a generar")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--max_instr", type=int, default=11)

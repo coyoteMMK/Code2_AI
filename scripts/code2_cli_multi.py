@@ -84,13 +84,13 @@ def elegir_modelo(base_dir: str):
         {
             "nombre": "Full Fine-Tuning (PyTorch FP32)",
             "descripcion": "Modelo completo en precisión FP32 - Mayor precisión",
-            "ruta": "../3.train_final/results_Full_optimizado_final",
+            "ruta": "../models/full_fp32",
             "tipo": "pytorch"
         },
         {
             "nombre": "ONNX INT8 Dynamic Quantization",
             "descripcion": "Modelo optimizado INT8 - Mayor velocidad y eficiencia",
-            "ruta": "../5.cuantizacion/t5_onnx_int8_dynamic",
+            "ruta": "../models/onnx_int8_dynamic",
             "tipo": "onnx"
         }
     ]

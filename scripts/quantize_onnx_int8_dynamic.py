@@ -9,7 +9,7 @@ from onnxruntime.quantization import quantize_dynamic, QuantType
 import torch
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-MODEL_PATH = "../3.train_final/results_Full_optimizado"
+MODEL_PATH = "./results_Full_optimizado"
 OUT_ONNX_FP32 = "./t5_onnx_fp32"
 OUT_ONNX_INT8 = "./t5_onnx_int8_dynamic"
 

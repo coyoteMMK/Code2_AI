@@ -21,8 +21,8 @@ warnings.filterwarnings('ignore')
 
 # Configuración
 MODEL_NAME = "t5-small"
-TRAIN_DATASET_PATH = "../datasource_36k/train.json"
-VALID_DATASET_PATH = "../datasource_36k/valid.json"
+TRAIN_DATASET_PATH = "../datasource/train.json"
+VALID_DATASET_PATH = "../datasource/valid.json"
 SAVE_DIR = "./results_Full_optimizado"  # Directorio para guardar el modelo
 OUTPUT_FILE = "resultados_full_optimizado.csv"
 RESULTS_TXT = "resultados_full_optimizado.txt"

@@ -13,104 +13,145 @@ Incluye:
 ## 📁 Estructura del repositorio
 
 ```
-CODE2_AI/
+Code2_AI/
 ├─ datasource/
-│  ├─ train.json
-│  ├─ valid.json
-│  └─ test.json
+│  ├─ train.json          # Dataset de entrenamiento
+│  ├─ valid.json          # Dataset de validación
+│  └─ test.json           # Dataset de prueba
 │
 ├─ models/
-│  ├─ full_fp32/           # modelo PyTorch (fine-tuning completo)
-│  └─ onnx_int8_dynamic/   # modelo ONNX cuantizado INT8 dinámico
+│  ├─ full_fp32/          # Modelo PyTorch pre-entrenado (opcional)
+│  └─ onnx_int8_dynamic/  # Modelo ONNX cuantizado (opcional)
 │
 ├─ scripts/
-│  ├─ training.py
-│  ├─ evaluate.py
-│  ├─ quantize_onnx_int8_dynamic.py
-│  ├─ showcase.py
-│  ├─ data-generation.py
-│  └─ test_env.py
+│  ├─ training.py                    # Entrenamiento Full Fine-Tuning
+│  ├─ evaluate.py                    # Evaluación interactiva
+│  ├─ quantize_onnx_int8_dynamic.py  # Cuantización ONNX
+│  ├─ code2_cli_multi.py             # Demo CLI interactiva
+│  ├─ data_generation.py             # Generador de datasets
+│  └─ test_env.py                    # Test de dependencias
+│
+├─ site/                  # Aplicación Next.js (frontend web - opcional)
 │
 ├─ README.md
-└─ requirements.txt
+├─ requirements.txt
+└─ requirements-torch.txt  # Dependencias PyTorch con CUDA
 ```
 
 ---
 
 ## ✅ Instalación
 
+```bash
 git clone https://github.com/coyoteMMK/Code2_AI.git
+cd Code2_AI
+```
 
-Se recomienda entorno virtual:
+Crear y activar entorno virtual (recomendado):
 
 ```bash
 python -m venv .venv
-# Windows:
-.venv\Scripts\activate
+
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+
+# Windows CMD:
+.venv\Scripts\activate.bat
+
 # Linux/Mac:
 source .venv/bin/activate
-````
+```
 
 Instalación de dependencias:
 
 ```bash
+# 1. Instalar PyTorch con soporte CUDA 12.1
+pip install -r requirements-torch.txt --index-url https://download.pytorch.org/whl/cu121
+
+# 2. Instalar el resto de dependencias
 pip install -r requirements.txt
+
+# 3. Verificar instalación
+cd scripts
+python test_env.py
 ```
+
+---
+
+## 📝 Generación de Datos
+
+Si necesitas generar un nuevo dataset o aumentar el existente:
+
+```bash
+cd scripts
+python data_generation.py --n_total 36000 --out_dir ../datasource
+```
+
+Parámetros disponibles:
+- `--n_total`: Número total de ejemplos (default: 36000)
+- `--out_dir`: Directorio de salida (default: ../datasource)
+- `--max_instr`: Máximo de instrucciones por ejemplo (default: 11)
+- `--train_ratio`: Proporción para entrenamiento (default: 0.70)
+- `--valid_ratio`: Proporción para validación (default: 0.20)
+- `--test_ratio`: Proporción para prueba (default: 0.10)
+- `--preserve_newlines`: Preservar saltos de línea como token SALTO
 
 ---
 
 ## 🏋️ Entrenamiento (Full Fine-Tuning)
 
-Entrena un modelo y lo guarda en `models/full_fp32/`.
+Entrena un modelo T5-small con Full Fine-Tuning. Los parámetros están configurados directamente en el archivo.
 
 ```bash
-python scripts/training.py \
-  --model_name t5-small \
-  --train_json datasource/train.json \
-  --valid_json datasource/valid.json \
-  --save_dir models/full_fp32
+cd scripts
+python training.py
 ```
 
-> Para continuar entrenando desde un modelo ya afinado (no desde `t5-small`), usa:
+Este script:
+- Carga `t5-small` desde Hugging Face
+- Entrena con los datos de `datasource/train.json` y `datasource/valid.json`
+- Guarda el modelo en `scripts/results_Full_optimizado/`
+- Genera métricas en CSV, TXT y JSON
 
-```bash
-python scripts/training.py \
-  --model_name models/full_fp32 \
-  --train_json datasource/train.json \
-  --valid_json datasource/valid.json \
-  --save_dir models/full_fp32
-```
+> Para modificar parámetros (batch size, learning rate, epochs, etc.), edita las variables de configuración al inicio de [training.py](scripts/training.py)
 
 ---
 
 ## ⚙️ Cuantización ONNX INT8 (PTQ dinámico)
 
-Exporta a ONNX y aplica cuantización INT8 dinámica. Guarda el resultado en `models/onnx_int8_dynamic/`.
+Exporta el modelo entrenado a ONNX y aplica cuantización INT8 dinámica.
 
 ```bash
-python scripts/quantize_onnx_int8_dynamic.py \
-  --model_dir models/full_fp32 \
-  --out_dir models/onnx_int8_dynamic
+cd scripts
+python quantize_onnx_int8_dynamic.py
 ```
 
----
+Este script:
+- Carga el modelo desde `scripts/results_Full_optimizado/`
+- Exporta a ONNX FP32 en `scripts/t5_onnx_fp32/`
+- Cuantiza a INT8 dinámico en `scripts/t5_onnx_int8_dynamic/`
 
-## 📊 Evaluación
-
-Evalúa **dos modelos**:
-
-* `models/full_fp32/` (PyTorch FP32)
-* `models/onnx_int8_dynamic/` (ONNX INT8 dinámico)
+> **uador interactivo que permite probar diferentes configuraciones (num_beams, temperature, top_p).
 
 ```bash
-python scripts/evaluate.py \
-  --fp32_dir models/full_fp32 \
-  --onnx_dir models/onnx_int8_dynamic \
-  --valid_json datasource/valid.json \
-  --n 2000
+cd scripts
+python evaluate.py
 ```
+
+Este script:
+- Carga el modelo desde `scripts/results_Full_optimizado/`
+- Evalúa con datos de `datasource/test.json`
+- Permite ajustar parámetros de generación interactivamente
+- Ver ejemplos de predicciones
+- Guardar historial de evaluaciones
 
 Métricas calculadas:
+
+* Exact Match (con normalización de espacios y saltos de línea)
+* BLEU
+* ROUGE-L
+
+> **Nota**: Por defecto usa 100 ejemplos del dataset de test para evaluación rápida. Modifica `SAMPLE_SIZE` en el archivo para cambiar esto
 
 * Exact Match (con normalización de espacios y saltos de línea)
 * BLEU
@@ -119,13 +160,22 @@ Métricas calculadas:
 * Longitud media en tokens
 
 ---
+CLI Interactiva
 
-## 🧪 Demo local (Gradio)
-
-Lanza una app local para introducir instrucciones multilínea y elegir modelo (FP32 u ONNX INT8).
+Interfaz de línea de comandos con menú interactivo para traducir lenguaje natural a código ensamblador CODE-2.
 
 ```bash
-python scripts/showcase.py
+cd scripts
+python code2_cli_multi.py
+```
+
+Características:
+- Menú de selección de modelo (PyTorch FP32 u ONNX INT8)
+- Entrada multilínea de instrucciones
+- Visualización de código generado con tiempo de inferencia
+- Soporte para TOKEN SALTO (saltos de línea en el ensamblador)
+
+> **Nota**: Asegúrate de haber entrenado el modelo primero con `training.py` y opcionalmente cuantizado con `quantize_onnx_int8_dynamic.python scripts/showcase.py
 ```
 
 ---
