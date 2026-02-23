@@ -367,7 +367,7 @@ while True:
             output_file = "eval_interactive_history.json"
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump({
-                    "model_path": MODEL_PATH,
+                    "model_path": selected_model_path,
                     "total_examples": len(preds),
                     "max_input_len": max_input_len,
                     "max_output_len": max_output_len,
