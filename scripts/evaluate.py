@@ -1,7 +1,9 @@
 """
 Evaluador interactivo del modelo con controles de temperatura, top_p y num_beams.
+Soporta múltiples modelos (Full FP32 y ONNX INT8).
 """
 import json
+import os
 import torch
 import numpy as np
 from datasets import load_dataset
@@ -10,17 +12,64 @@ from torch.utils.data import DataLoader
 from rouge_score import rouge_scorer
 from nltk.translate.bleu_score import corpus_bleu, SmoothingFunction
 
+try:
+    from optimum.onnxruntime import ORTModelForSeq2SeqLM
+except Exception:
+    ORTModelForSeq2SeqLM = None
+
+try:
+    import onnxruntime as ort
+except Exception:
+    ort = None
+
 # Configuración
-MODEL_PATH = "./results_Full_optimizado"
+MODELS = {
+    "Full FP32": "../models/full_fp32",
+    "ONNX INT8": "../models/onnx_int8_dynamic",
+}
+
 VALID_DATASET_PATH = "../datasource/test.json"
 SAMPLE_SIZE = 100
 BATCH_SIZE = 32
+TOKENIZER_PATH = "../models/full_fp32"  # Usar el mismo tokenizer para ambos modelos
 
 def _normalize_for_exact_match(text):
     text = text.replace("\n", " SALTO ")
     text = text.replace(" SALTO ", " SALTO ")
     text = " ".join(text.split())
     return text.strip().lower()
+
+
+def load_model_for_evaluation(model_name: str, model_path: str, device: str = "cuda"):
+    """
+    Carga los modelos apropiados (PyTorch o ONNX) según el modelo seleccionado.
+    Retorna: (modelo, device_usado)
+    """
+    is_onnx = "ONNX" in model_name
+    
+    if is_onnx:
+        if ORTModelForSeq2SeqLM is None:
+            raise RuntimeError(
+                "ONNX no disponible. Instala: pip install optimum[onnxruntime] onnxruntime"
+            )
+        
+        # ONNX siempre en CPU para evitar problemas
+        print(f"\n[INFO] Cargando modelo ONNX en CPU...")
+        model = ORTModelForSeq2SeqLM.from_pretrained(
+            model_path,
+            provider="CPUExecutionProvider",
+            encoder_file_name="encoder_model.onnx",
+            decoder_file_name="decoder_model.onnx",
+            decoder_with_past_file_name="decoder_with_past_model.onnx",
+        )
+        return model, "cpu"
+    
+    # PyTorch (Full FP32)
+    print(f"\n[INFO] Cargando modelo PyTorch...")
+    model = T5ForConditionalGeneration.from_pretrained(model_path)
+    model.eval()
+    model.to(device)
+    return model, device
 
 def calculate_bleu(predictions, references):
     try:
@@ -64,14 +113,21 @@ def calculate_optimal_max_length(dataset_raw, tokenizer):
         max_output = max(max_output, len(output_tokens))
     return min(512, max_input + 10), min(512, max_output + 10)
 
-def generate_predictions_batched(model, tokenizer, hf_dataset, device, max_gen_len, batch_size, gen_kwargs):
+def generate_predictions_batched(model, tokenizer, hf_dataset, device, max_gen_len, batch_size, gen_kwargs, model_type="pytorch"):
     model.eval()
     preds = []
     dl = DataLoader(hf_dataset, batch_size=batch_size, shuffle=False)
     with torch.no_grad():
         for batch in dl:
-            input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
+            if model_type == "onnx":
+                # ONNX no necesita .to(device)
+                input_ids = batch["input_ids"]
+                attention_mask = batch["attention_mask"]
+            else:
+                # PyTorch
+                input_ids = batch["input_ids"].to(device)
+                attention_mask = batch["attention_mask"].to(device)
+            
             outputs = model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -81,12 +137,9 @@ def generate_predictions_batched(model, tokenizer, hf_dataset, device, max_gen_l
             preds.extend(tokenizer.batch_decode(outputs, skip_special_tokens=True))
     return preds
 
-# Cargar modelo y tokenizer
-print("Cargando tokenizer y modelo...")
-tokenizer = T5Tokenizer.from_pretrained(MODEL_PATH, legacy=False)
-model = T5ForConditionalGeneration.from_pretrained(MODEL_PATH)
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model.to(device)
+# Cargar tokenizer (igual para todos)
+print("\nCargando tokenizer...")
+tokenizer = T5Tokenizer.from_pretrained(TOKENIZER_PATH, legacy=False)
 
 # Cargar dataset
 print("Cargando dataset...")
@@ -111,13 +164,52 @@ val_tok.set_format(type="torch", columns=["input_ids", "attention_mask"])
 references = [ex["output"].replace("\n", " SALTO ") for ex in val_raw]
 
 print("\n" + "=" * 80)
+print("SELECCIONA UN MODELO PARA EVALUAR")
+print("=" * 80)
+
+model_options = list(MODELS.items())
+for i, (name, path) in enumerate(model_options, 1):
+    print(f"  {i}. {name}")
+    if not os.path.exists(path):
+        print(f"     [ADVERTENCIA] Ruta no encontrada: {path}")
+
+while True:
+    try:
+        selection = input("\nSelecciona un modelo (número): ").strip()
+        model_idx = int(selection) - 1
+        if 0 <= model_idx < len(model_options):
+            selected_model_name, selected_model_path = model_options[model_idx]
+            break
+        else:
+            print(f"[ERROR] Selecciona un número entre 1 y {len(model_options)}")
+    except ValueError:
+        print("[ERROR] Entrada inválida. Ingresa un número.")
+
+# Verificar que el modelo existe
+if not os.path.exists(selected_model_path):
+    print(f"[ERROR] El modelo no existe en: {selected_model_path}")
+    exit(1)
+
+# Cargar modelo
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model_type = "onnx" if "ONNX" in selected_model_name else "pytorch"
+
+try:
+    model, device_used = load_model_for_evaluation(selected_model_name, selected_model_path, device)
+except Exception as e:
+    print(f"[ERROR] No se pudo cargar el modelo: {e}")
+    exit(1)
+
+print("\n" + "=" * 80)
 print("EVALUADOR INTERACTIVO - MODELO T5")
 print("=" * 80)
-print(f"[OK] Modelo cargado: {MODEL_PATH}")
+print(f"[OK] Modelo cargado: {selected_model_name}")
+print(f"[OK] Ruta: {selected_model_path}")
 print(f"[OK] Dataset: {SAMPLE_SIZE} ejemplos de validation")
-print(f"[OK] Device: {device}")
+print(f"[OK] Device: {device_used}")
 print(f"[CONFIG] Max input length: {max_input_len}")
 print(f"[CONFIG] Max output length: {max_output_len}")
+print(f"[CONFIG] Tipo de modelo: {model_type}")
 
 # Valores por defecto
 default_num_beams = 1
@@ -164,10 +256,11 @@ while True:
         torch.cuda.manual_seed_all(42)
     
     preds = generate_predictions_batched(
-        model, tokenizer, val_tok, device,
+        model, tokenizer, val_tok, device_used,
         max_gen_len=max_output_len,
         batch_size=BATCH_SIZE,
         gen_kwargs=gen_kwargs,
+        model_type=model_type,
     )
     
     bleu = calculate_bleu(preds, references)
