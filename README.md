@@ -1,5 +1,7 @@
 # CODE2_AI — Traductor NL → CODE-2 (T5 fine-tuning + ONNX INT8)
 
+> **Versión mínima de Python requerida:** 3.8
+
 Un **traductor automático** de lenguaje natural a código ensamblador **CODE-2** basado en el modelo T5 (Text-to-Text Transfer Transformer) de Google.
 
 ## 🎯 Descripción general
@@ -58,7 +60,7 @@ Code2_AI/
 
 | Componente | Requisito | Notas |
 |-----------|-----------|-------|
-| **Python** | ≥ 3.8 | Probado con 3.10, 3.11, 3.12 |
+| **Python** | **≥ 3.8 (mínimo)** | Probado con 3.10, 3.11, 3.12 |
 | **RAM** | ≥ 8 GB | Recomendado ≥ 16 GB para entrenamiento |
 | **Navegador** | Cualquiera | Para interfaz web (opcional) |
 
