@@ -78,7 +78,7 @@ export default function Page() {
       const client = await Client.connect(SPACE_ID);
 
       const modelo_sel =
-        modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más pesado)";
+        modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)";
 
       const result = await client.predict(ENDPOINT, [
         input,
