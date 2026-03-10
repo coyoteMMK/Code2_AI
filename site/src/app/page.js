@@ -4,6 +4,8 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import { Client } from "@gradio/client";
 
 export default function Page() {
+  const publicBasePath = process.env.NODE_ENV === "production" ? "/Code2_AI" : "";
+
   const [input, setInput] = useState("");
   const [displayedOutput, setDisplayedOutput] = useState("");
   const [fullOutput, setFullOutput] = useState("");
@@ -158,7 +160,7 @@ export default function Page() {
           <div className="flex min-w-[200px] flex-1 items-center justify-center">
             <div className="flex items-center gap-3">
               <img
-                src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/code2-logo.svg`}
+                src={`${publicBasePath}/code2-logo.svg`}
                 alt="Code-2"
                 className="h-8 w-8"
               />
