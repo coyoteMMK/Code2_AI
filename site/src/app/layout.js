@@ -11,6 +11,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const publicBasePath = process.env.NODE_ENV === "production" ? "/Code2_AI" : "";
+
 export const metadata = {
   title: "Code2 AI By Santos Bernabeu",
   description: "Convertidor de instrucciones en código ensamblador medianrte IA",
@@ -24,6 +26,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href={`${publicBasePath}/code2-logo.svg`} type="image/svg+xml" />
+        <link rel="shortcut icon" href={`${publicBasePath}/code2-logo.svg`} type="image/svg+xml" />
+        <link rel="apple-touch-icon" href={`${publicBasePath}/code2-logo.svg`} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
