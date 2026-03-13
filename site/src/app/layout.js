@@ -15,13 +15,9 @@ export const metadata = {
   title: "Code2 AI By Santos Bernabeu",
   description: "Convertidor de instrucciones en código ensamblador medianrte IA",
   icons: {
-    icon: [
-      { url: "/favicon.ico" },
-      { url: "/icon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/icon-16.png", sizes: "16x16", type: "image/png" },
-    ],
-    shortcut: ["/favicon.ico"],
-    apple: [{ url: "/apple-icon.png" }],
+    icon: [{ url: "/code2-logo.svg", type: "image/svg+xml" }],
+    shortcut: ["/code2-logo.svg"],
+    apple: [{ url: "/code2-logo.svg" }],
   },
 };
 
