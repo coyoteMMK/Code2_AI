@@ -182,7 +182,7 @@ export default function Page() {
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight + 2}px`;
 
       const hasLineBreak = input.includes("\n");
       const height = textareaRef.current.scrollHeight;
@@ -517,10 +517,10 @@ export default function Page() {
   };
 
   return (
-    <main className="relative flex h-screen flex-col bg-linear-to-br from-slate-950 via-slate-900 to-stone-900 text-slate-100">
+    <main className="relative flex min-h-dvh flex-col bg-linear-to-br from-slate-950 via-slate-900 to-stone-900 text-slate-100">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(75%_60%_at_20%_0%,rgba(148,163,184,0.12),transparent_70%)]" />
       {/* Header */}
-      <div className="relative border-b border-white/10 bg-black/40 px-6 py-4 backdrop-blur">
+      <div className="relative border-b border-white/10 bg-black/40 px-3 py-3 sm:px-6 sm:py-4 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 lg:flex-nowrap">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             <Image
@@ -528,10 +528,10 @@ export default function Page() {
               alt="Code-2"
               width={40}
               height={40}
-              className="h-10 w-10"
+              className="h-8 w-8 sm:h-10 sm:w-10"
             />
 
-            <h1 className="text-3xl font-semibold text-slate-100">Code-2 Translator</h1>
+            <h1 className="text-xl sm:text-3xl font-semibold text-slate-100">Code-2 Translator</h1>
           </div>
 
           {warmupVisible && (warmingUp || warmupStatus || warmupFadingOut) && (
@@ -541,14 +541,14 @@ export default function Page() {
               } transition-opacity duration-300`}
             >
               <div
-                className={`inline-flex w-fit max-w-2xl rounded-xl border border-cyan-400/30 bg-cyan-950/30 px-6 py-2 text-sm text-cyan-100 lg:pointer-events-auto`}
+                className={`inline-flex w-fit max-w-[92vw] sm:max-w-2xl rounded-xl border border-cyan-400/30 bg-cyan-950/30 px-3 sm:px-6 py-2 text-xs sm:text-sm text-cyan-100 lg:pointer-events-auto`}
               >
                 {warmupStatus}
               </div>
             </div>
           )}
 
-          <div className="ml-auto flex items-center gap-3 rounded-2xl bg-slate-900/55 px-4 py-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-sm">
+          <div className="ml-auto flex w-full sm:w-auto items-center justify-between sm:justify-start gap-3 rounded-2xl bg-slate-900/55 px-3 sm:px-4 py-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-sm">
             <div className="flex flex-col leading-none">
               <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-300">
                 Modelo
@@ -558,7 +558,7 @@ export default function Page() {
 
             <div className="relative">
               <select
-                className="appearance-none rounded-xl bg-slate-800/80 py-2 pl-4 pr-10 text-sm font-medium text-slate-100 outline-none ring-1 ring-white/8 transition focus:ring-2 focus:ring-cyan-400/50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="appearance-none rounded-xl bg-slate-800/80 py-2 pl-3 sm:pl-4 pr-9 sm:pr-10 text-xs sm:text-sm font-medium text-slate-100 outline-none ring-1 ring-white/8 transition focus:ring-2 focus:ring-cyan-400/50 disabled:cursor-not-allowed disabled:opacity-60"
                 value={modelChoice}
                 onChange={(e) => setModelChoice(e.target.value)}
                 disabled={loading}
@@ -584,7 +584,7 @@ export default function Page() {
       </div>
 
       {/* Chat Area */}
-      <div className="relative flex-1 overflow-y-auto px-6 py-6 soft-scroll">
+      <div className="relative flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 soft-scroll">
         <div className="mx-auto max-w-5xl space-y-4">
           {messages.map((msg) => (
             <div
@@ -592,7 +592,7 @@ export default function Page() {
               className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`relative max-w-2xl rounded-2xl px-5 py-3 ${
+                className={`relative max-w-[90%] sm:max-w-2xl rounded-2xl px-3 sm:px-5 py-2.5 sm:py-3 ${
                   msg.type === "user"
                     ? "bg-slate-700/80 text-slate-100 rounded-br-none"
                     : msg.isError
@@ -603,7 +603,7 @@ export default function Page() {
                 {msg.type === "assistant" && !msg.isError && !msg.isWelcome && msg.content?.trim() && (
                   <button
                     onClick={() => copyResult(msg.id, msg.content)}
-                    className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-slate-900/80 text-slate-200 transition-colors hover:bg-slate-800"
+                    className="absolute right-2 top-2 sm:right-3 sm:top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-slate-900/80 text-slate-200 transition-colors hover:bg-slate-800"
                     title={copiedMessageId === msg.id ? "Copiado" : "Copiar"}
                     aria-label={copiedMessageId === msg.id ? "Copiado" : "Copiar respuesta"}
                   >
@@ -616,7 +616,13 @@ export default function Page() {
                     />
                   </button>
                 )}
-                <p className="whitespace-pre-wrap wrap-break-word text-base leading-relaxed">
+                <p
+                  className={`whitespace-pre-wrap wrap-break-word text-sm sm:text-base leading-relaxed ${
+                    msg.type === "assistant" && !msg.isError && !msg.isWelcome && msg.content?.trim()
+                      ? "pr-10 sm:pr-12"
+                      : ""
+                  }`}
+                >
                   {msg.content}
                   {msg.isTyping && (
                     <span
@@ -628,7 +634,7 @@ export default function Page() {
                 {(msg.type === "assistant" && !msg.isError) || msg.latency ? (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     {msg.latency && (
-                      <p className="text-sm text-slate-400">
+                      <p className="text-xs sm:text-sm text-slate-400">
                         ⏱ {msg.latency.toFixed(3)}s • {msg.model}
                       </p>
                     )}
@@ -640,7 +646,7 @@ export default function Page() {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="rounded-2xl rounded-bl-none bg-slate-800/70 border border-white/10 px-5 py-3">
+              <div className="rounded-2xl rounded-bl-none bg-slate-800/70 border border-white/10 px-4 sm:px-5 py-3 max-w-[90%] sm:max-w-2xl">
                 <div className="flex gap-2">
                   <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" />
                   <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce delay-100" />
@@ -660,13 +666,13 @@ export default function Page() {
       </div>
 
       {/* Settings & Input Bar */}
-      <div className="relative px-6 py-4 mb-3">
+      <div className="relative px-3 sm:px-6 py-3 sm:py-4 mb-2 sm:mb-3">
         <div className="relative mx-auto max-w-5xl">
           {showParamsMenu && (
-            <div className="absolute bottom-full left-0 z-30 mb-3 w-fit max-w-[calc(100vw-3rem)] rounded-3xl border border-white/10 bg-slate-950/92 p-3 shadow-[0_24px_80px_rgba(2,6,23,0.65)] backdrop-blur-xl">
-              <div ref={paramsMenuRef} className="flex flex-wrap items-end gap-3">
-                <label className="flex min-w-33 flex-col gap-2 rounded-2xl bg-slate-900/60 px-3 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
-                  <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
+            <div className="absolute bottom-full left-0 z-30 mb-3 w-[min(75vw,15rem)] translate-x-0 sm:w-fit max-w-[calc(100vw-1.5rem)] sm:max-w-[calc(100vw-3rem)] rounded-3xl border border-white/10 bg-slate-950/92 p-2 sm:p-3 shadow-[0_24px_80px_rgba(2,6,23,0.65)] backdrop-blur-xl">
+              <div ref={paramsMenuRef} className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-2 sm:gap-3">
+                <label className="flex w-full sm:w-auto min-w-0 sm:min-w-33 flex-col items-center gap-2 rounded-2xl bg-slate-900/60 px-3 py-3 text-center shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
+                  <span className="w-full text-center text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
                     Beams
                   </span>
                   <div className="flex items-center gap-1 rounded-xl bg-slate-800/85 p-1 ring-1 ring-white/8 transition focus-within:ring-2 focus-within:ring-cyan-400/50">
@@ -705,8 +711,8 @@ export default function Page() {
                   </div>
                 </label>
 
-                <label className="flex min-w-33 flex-col gap-2 rounded-2xl bg-slate-900/60 px-3 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
-                  <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
+                <label className="flex w-full sm:w-auto min-w-0 sm:min-w-33 flex-col items-center gap-2 rounded-2xl bg-slate-900/60 px-3 py-3 text-center shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
+                  <span className="w-full text-center text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
                     Temp
                   </span>
                   <div className="flex items-center gap-1 rounded-xl bg-slate-800/85 p-1 ring-1 ring-white/8 transition focus-within:ring-2 focus-within:ring-cyan-400/50">
@@ -751,8 +757,8 @@ export default function Page() {
                   </div>
                 </label>
 
-                <label className="flex min-w-33 flex-col gap-2 rounded-2xl bg-slate-900/60 px-3 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
-                  <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
+                <label className="flex w-full sm:w-auto min-w-0 sm:min-w-33 flex-col items-center gap-2 rounded-2xl bg-slate-900/60 px-3 py-3 text-center shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
+                  <span className="w-full text-center text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
                     Top-p
                   </span>
                   <div className="flex items-center gap-1 rounded-xl bg-slate-800/85 p-1 ring-1 ring-white/8 transition focus-within:ring-2 focus-within:ring-cyan-400/50">
@@ -789,7 +795,7 @@ export default function Page() {
                   </div>
                 </label>
 
-                <div className="flex min-h-21 min-w-40 items-center justify-center rounded-2xl bg-slate-900/60 px-3 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
+                <div className="flex w-full sm:w-auto min-h-21 min-w-0 sm:min-w-40 items-center justify-center rounded-2xl bg-slate-900/60 px-3 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
                   <button
                     onClick={resetSettings}
                     disabled={loading}
@@ -803,13 +809,13 @@ export default function Page() {
           )}
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-2">
-            <div className={isInputMultiline ? "flex flex-col gap-2" : "flex items-end gap-3"}>
+            <div className={isInputMultiline ? "flex flex-col gap-2" : "flex items-end gap-2 sm:gap-3"}>
               {!isInputMultiline && (
                 <button
                   ref={paramsToggleRef}
                   onClick={() => setShowParamsMenu((prev) => !prev)}
                   disabled={loading}
-                  className="self-end inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-slate-900/70 text-slate-100 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="self-end inline-flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-white/15 bg-slate-900/70 text-slate-100 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                   title={showParamsMenu ? "Ocultar parámetros" : "Mostrar parámetros"}
                   aria-label={showParamsMenu ? "Ocultar parámetros" : "Mostrar parámetros"}
                 >
@@ -819,10 +825,10 @@ export default function Page() {
 
               <textarea
                 ref={textareaRef}
-                className={`soft-scroll rounded-2xl bg-slate-900/70 border border-white/10 px-4 py-2 text-base leading-6 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-300 resize-none max-h-40 min-h-11 overflow-y-auto ${
+                className={`soft-scroll rounded-2xl bg-slate-900/70 border border-white/10 px-3 sm:px-4 py-2 text-sm sm:text-base leading-6 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-300 resize-none max-h-34 sm:max-h-40 min-h-10 sm:min-h-11 overflow-y-auto ${
                   isInputMultiline ? "w-full" : "flex-1"
                 }`}
-                placeholder="Escribe tu instruccion aqui... (Enter para enviar, Shift/Ctrl+Enter para nueva linea)"
+                placeholder="Escribe aquí..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -836,7 +842,7 @@ export default function Page() {
                     ref={paramsToggleRef}
                     onClick={() => setShowParamsMenu((prev) => !prev)}
                     disabled={loading}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-slate-900/70 text-slate-100 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-white/15 bg-slate-900/70 text-slate-100 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                     title={showParamsMenu ? "Ocultar parámetros" : "Mostrar parámetros"}
                     aria-label={showParamsMenu ? "Ocultar parámetros" : "Mostrar parámetros"}
                   >
@@ -848,7 +854,7 @@ export default function Page() {
                   <button
                     onClick={run}
                     disabled={loading || !input.trim()}
-                    className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none transition-colors"
+                    className="rounded-2xl bg-slate-100 px-3 sm:px-4 py-2.5 sm:py-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none transition-colors"
                   >
                     {loading ? (
                       "..."
@@ -873,7 +879,7 @@ export default function Page() {
                 <button
                   onClick={run}
                   disabled={loading || !input.trim()}
-                  className="self-end rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none transition-colors"
+                  className="self-end rounded-2xl bg-slate-100 px-3 sm:px-4 py-2.5 sm:py-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 disabled:shadow-none transition-colors"
                 >
                   {loading ? (
                     "..."
