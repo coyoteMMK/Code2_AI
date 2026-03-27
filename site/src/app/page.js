@@ -292,6 +292,27 @@ export default function Page() {
         setWarmupFadingOut(false);
         setWarmupStatus("Conectando con Hugging Face...");
 
+        // --- Petición HTTP directa para despertar el Space ---
+        setWarmupStatus("⏳ Despertando servidor... Esto puede tardar unos segundos si el servidor está dormido.");
+        try {
+          await fetch("https://coyoteMMK-code2-ai.hf.space/generar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              data: [
+                "mov eax, 1",
+                "Full FP32 (más preciso)",
+                1,
+                0.2,
+                0.6
+              ]
+            }),
+          });
+        } catch (e) {
+          // Ignorar errores, solo queremos despertar el Space
+        }
+
+        // --- Ahora sí, flujo normal con la librería ---
         const client = await Client.connect(SPACE_ID, {
           status_callback: (status) => {
             if (cancelled) return;
@@ -315,20 +336,16 @@ export default function Page() {
           },
         });
 
-        // Petición dummy para forzar el arranque real
-        // Usar un input válido y simple
-        const dummyInput = "mov eax, 1";
+        // Petición dummy para forzar el arranque real (opcional, por si el fetch no basta)
         try {
           await client.predict(ENDPOINT, [
-            dummyInput,
+            "mov eax, 1",
             modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)",
-            1, // beams mínimo
-            0.2, // temperatura
-            0.6, // topP
+            1,
+            0.2,
+            0.6,
           ]);
-        } catch (e) {
-          // Ignorar errores de la petición dummy
-        }
+        } catch (e) {}
 
         if (!cancelled) {
           setReadyStatus();
