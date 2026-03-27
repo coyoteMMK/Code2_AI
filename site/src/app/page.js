@@ -76,6 +76,121 @@ export default function Page() {
     return Number(next.toFixed(decimals));
   };
 
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const isRecoverableSpaceError = (error) => {
+    const msg = String(error?.message ?? error ?? "").toLowerCase();
+
+    return (
+      msg.includes("sleep") ||
+      msg.includes("loading") ||
+      msg.includes("building") ||
+      msg.includes("starting") ||
+      msg.includes("503") ||
+      msg.includes("connection errored out") ||
+      msg.includes("space is not ready") ||
+      msg.includes("fetch failed") ||
+      msg.includes("not healthy") ||
+      msg.includes("runtime error") ||
+      msg.includes("queue is full") ||
+      msg.includes("connection refused")
+    );
+  };
+
+  const isOwnerPausedError = (error) => {
+    const msg = String(error?.message ?? error ?? "").toLowerCase();
+    return (
+      msg.includes("paused by its owner") ||
+      msg.includes("space is paused") ||
+      msg.includes("this space is paused")
+    );
+  };
+
+  async function connectWithRetry(spaceId, setHint, maxAttempts = 8) {
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        setHint?.(
+          attempt === 1
+            ? "Conectando con Hugging Face..."
+            : `Despertando servidor... intento ${attempt}/${maxAttempts}`
+        );
+
+        const client = await Client.connect(spaceId, {
+          status_callback: (status) => {
+            const stage = String(status?.stage ?? "").toLowerCase();
+            const message = String(status?.message ?? "").trim();
+
+            if (
+              stage.includes("sleep") ||
+              stage.includes("building") ||
+              stage.includes("starting") ||
+              stage.includes("loading")
+            ) {
+              setHint?.("⏳ El servidor está arrancando. Esperando a que esté listo...");
+              return;
+            }
+
+            if (stage.includes("running") || stage.includes("connected")) {
+              setHint?.("Servidor activo. Generando respuesta...");
+              return;
+            }
+
+            if (message) {
+              setHint?.(message);
+            }
+          },
+        });
+
+        return client;
+      } catch (error) {
+        lastError = error;
+
+        if (isOwnerPausedError(error)) {
+          throw error;
+        }
+
+        if (!isRecoverableSpaceError(error) || attempt === maxAttempts) {
+          throw error;
+        }
+
+        setHint?.("⏳ El Space todavía no está listo. Reintentando...");
+        await sleep(Math.min(2000 * attempt, 8000));
+      }
+    }
+
+    throw lastError;
+  }
+
+  async function predictWithRetry(client, endpoint, payload, setHint, maxAttempts = 6) {
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        if (attempt > 1) {
+          setHint?.(`⏳ Esperando a que el modelo termine de arrancar... intento ${attempt}/${maxAttempts}`);
+        }
+
+        return await client.predict(endpoint, payload);
+      } catch (error) {
+        lastError = error;
+
+        if (isOwnerPausedError(error)) {
+          throw error;
+        }
+
+        if (!isRecoverableSpaceError(error) || attempt === maxAttempts) {
+          throw error;
+        }
+
+        await sleep(Math.min(2000 * attempt, 8000));
+      }
+    }
+
+    throw lastError;
+  }
+
   const handleBeamsChange = (rawValue) => {
     if (rawValue === "") {
       setBeams("");
@@ -126,7 +241,6 @@ export default function Page() {
     setTopP(normalizedRaw);
   };
 
-  // Efecto de escritura letra a letra
   useEffect(() => {
     if (loading || !fullOutput || !typingMessageId) return;
 
@@ -190,10 +304,7 @@ export default function Page() {
       setIsInputMultiline((prev) => {
         if (input.length === 0) return false;
 
-        // Entra a modo multilínea con umbral alto.
         const shouldEnterMultiline = hasLineBreak || height > 56 || input.length > 80;
-
-        // Sale de modo multilínea solo con umbral más estricto para evitar "rebote" visual.
         const canReturnSingleLine = !hasLineBreak && height <= 52 && input.length < 60;
 
         if (prev) return !canReturnSingleLine;
@@ -272,9 +383,11 @@ export default function Page() {
       setWarmupStatus("✅ Servidor listo para responder.");
       clearTimeout(hideReadyMessageTimer);
       clearTimeout(fadeOutTimer);
+
       hideReadyMessageTimer = setTimeout(() => {
         if (cancelled) return;
         setWarmupFadingOut(true);
+
         fadeOutTimer = setTimeout(() => {
           if (!cancelled) {
             setWarmupStatus("");
@@ -292,69 +405,60 @@ export default function Page() {
         setWarmupFadingOut(false);
         setWarmupStatus("Conectando con Hugging Face...");
 
-        // --- Petición HTTP directa para despertar el Space (URL correcta) ---
-        setWarmupStatus("⏳ Despertando servidor... Esto puede tardar unos segundos si el servidor está dormido.");
-        try {
-          await fetch("https://coyoteMMK-code2-ai.hf.space/api/predict/", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              data: [
-                "mov eax, 1",
-                "Full FP32 (más preciso)",
-                1,
-                0.2,
-                0.6
-              ]
-            }),
-          });
-        } catch (e) {
-          // Ignorar errores, solo queremos despertar el Space
-        }
-
-        // --- Ahora sí, flujo normal con la librería ---
-        const client = await Client.connect(SPACE_ID, {
-          status_callback: (status) => {
-            if (cancelled) return;
-            const stage = String(status?.stage ?? "").toLowerCase();
-            if (
-              stage.includes("sleep") ||
-              stage.includes("paused") ||
-              stage.includes("building") ||
-              stage.includes("starting") ||
-              stage.includes("loading")
-            ) {
+        const client = await connectWithRetry(
+          SPACE_ID,
+          (msg) => {
+            if (!cancelled) {
               setWarmupVisible(true);
               setWarmupFadingOut(false);
-              setWarmupStatus("⏳ El Space está dormido o arrancando. Lo estoy despertando...");
-              return;
-            }
-            if (stage.includes("running") || stage.includes("connected")) {
-              setReadyStatus();
-              return;
+              setWarmupStatus(msg);
             }
           },
-        });
+          8
+        );
 
-        // Petición dummy para forzar el arranque real (opcional, por si el fetch no basta)
         try {
-          await client.predict(ENDPOINT, [
-            "mov eax, 1",
-            modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)",
-            1,
-            0.2,
-            0.6,
-          ]);
-        } catch (e) {}
+          await predictWithRetry(
+            client,
+            ENDPOINT,
+            [
+              "mov eax, 1",
+              modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)",
+              1,
+              0.2,
+              0.6,
+            ],
+            (msg) => {
+              if (!cancelled) {
+                setWarmupVisible(true);
+                setWarmupFadingOut(false);
+                setWarmupStatus(msg);
+              }
+            },
+            6
+          );
+        } catch {
+          // No bloqueamos la UI si falla el warmup dummy.
+        }
 
         if (!cancelled) {
           setReadyStatus();
         }
-      } catch {
+      } catch (e) {
         if (!cancelled) {
-          setWarmupVisible(true);
-          setWarmupFadingOut(false);
-          setWarmupStatus("⚠️ No pude confirmar el estado del servidor.");
+          if (isOwnerPausedError(e)) {
+            setWarmupVisible(true);
+            setWarmupFadingOut(false);
+            setWarmupStatus(
+              "⚠️ El Space está pausado por el owner. Hay que reiniciarlo en Hugging Face."
+            );
+          } else {
+            setWarmupVisible(true);
+            setWarmupFadingOut(false);
+            setWarmupStatus(
+              "⚠️ No pude confirmar el estado del servidor. Se reintentará al enviar una consulta."
+            );
+          }
         }
       } finally {
         if (!cancelled) {
@@ -372,7 +476,7 @@ export default function Page() {
       clearTimeout(hideReadyMessageTimer);
       clearTimeout(fadeOutTimer);
     };
-  }, [SPACE_ID]);
+  }, [SPACE_ID, ENDPOINT, modelChoice]);
 
   const resetSettings = () => {
     setModelChoice(DEFAULT_SETTINGS.modelChoice);
@@ -411,12 +515,12 @@ export default function Page() {
     setTemperature(requestTemperature);
     setTopP(requestTopP);
 
-    // Agregar mensaje del usuario al chat
     const userMessage = {
       id: userMessageId,
       type: "user",
       content: userPrompt,
     };
+
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
@@ -429,86 +533,72 @@ export default function Page() {
     try {
       const t0 = performance.now();
 
-      const client = await Client.connect(SPACE_ID, {
-        status_callback: (status) => {
-          const stage = String(status?.stage ?? "").toLowerCase();
-          const message = String(status?.message ?? "");
-
-          if (
-            stage.includes("sleep") ||
-            stage.includes("paused") ||
-            stage.includes("building") ||
-            stage.includes("starting") ||
-            stage.includes("loading")
-          ) {
+      const client = await connectWithRetry(
+        SPACE_ID,
+        (msg) => {
+          setLoadingHint(msg);
+          if (/arrancando|despertando|esperando/i.test(msg)) {
             setServerPaused(true);
-            setLoadingHint(
-              "⏳ El servidor de Hugging Face está en pausa/despertando. Esto puede tardar unos segundos..."
-            );
-            return;
-          }
-
-          if (stage.includes("running") || stage.includes("connected")) {
+          } else {
             setServerPaused(false);
-            setLoadingHint("Servidor activo. Generando respuesta...");
-            return;
-          }
-
-          if (message.trim()) {
-            setLoadingHint(message);
           }
         },
-      });
+        8
+      );
 
       const modelo_sel =
         modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)";
 
-      const result = await client.predict(ENDPOINT, [
-        userPrompt,
-        modelo_sel,
-        requestBeams,
-        requestTemperature,
-        requestTopP,
-      ]);
+      const result = await predictWithRetry(
+        client,
+        ENDPOINT,
+        [userPrompt, modelo_sel, requestBeams, requestTemperature, requestTopP],
+        (msg) => setLoadingHint(msg),
+        6
+      );
 
       const t1 = performance.now();
 
       const salida = String(result?.data?.[0] ?? "");
       const tiempoStr = String(result?.data?.[1] ?? "");
-
-      setFullOutput(salida);
-
       const parsed = parseFloat(tiempoStr.replace("s", "").trim());
-      if (!Number.isNaN(parsed)) setLatency(parsed);
-      else setLatency((t1 - t0) / 1000);
+      const finalLatency = !Number.isNaN(parsed) ? parsed : (t1 - t0) / 1000;
 
       const assistantMessageId = userMessageId + 1;
+
       setMessages((prev) => [
         ...prev,
         {
           id: assistantMessageId,
           type: "assistant",
           content: "",
-          latency: !Number.isNaN(parsed) ? parsed : (t1 - t0) / 1000,
+          latency: finalLatency,
           model: modelo_sel,
           isTyping: true,
         },
       ]);
+
       setTypingMessageId(assistantMessageId);
       setFullOutput(salida);
+      setLatency(finalLatency);
     } catch (e) {
       const rawError = String(e?.message ?? e ?? "");
-      const isLikelyPaused = /(sleep|paused|loading|building|starting)/i.test(rawError);
-      const errorMsg = isLikelyPaused
-        ? "⏳ El Space de Hugging Face está en pausa o arrancando. Intenta de nuevo en unos segundos."
+      const isOwnerPaused = isOwnerPausedError(e);
+      const isRecoverable = isRecoverableSpaceError(e);
+
+      const errorMsg = isOwnerPaused
+        ? "⚠️ El Space está pausado por el owner en Hugging Face. Hay que darle a Restart allí o reiniciarlo desde un backend con token."
+        : isRecoverable
+        ? "⏳ El Space estaba arrancando pero no llegó a estar listo a tiempo. Intenta otra vez en unos segundos."
         : "❌ Error: " + rawError;
+
       setMessages((prev) => [
         ...prev,
         {
           id: userMessageId + 1,
           type: "assistant",
           content: errorMsg,
-          isError: !isLikelyPaused,
+          isError: !isRecoverable,
         },
       ]);
     } finally {
@@ -548,7 +638,7 @@ export default function Page() {
   return (
     <main className="relative flex min-h-dvh flex-col bg-linear-to-br from-slate-950 via-slate-900 to-stone-900 text-slate-100">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(75%_60%_at_20%_0%,rgba(148,163,184,0.12),transparent_70%)]" />
-      {/* Header */}
+
       <div className="relative border-b border-white/10 bg-black/40 px-3 py-3 sm:px-6 sm:py-4 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 lg:flex-nowrap">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -569,9 +659,7 @@ export default function Page() {
                 warmupFadingOut ? "opacity-0" : "opacity-100"
               } transition-opacity duration-300`}
             >
-              <div
-                className={`inline-flex w-fit max-w-[92vw] sm:max-w-2xl rounded-xl border border-cyan-400/30 bg-cyan-950/30 px-3 sm:px-6 py-2 text-xs sm:text-sm text-cyan-100 lg:pointer-events-auto`}
-              >
+              <div className="inline-flex w-fit max-w-[92vw] sm:max-w-2xl rounded-xl border border-cyan-400/30 bg-cyan-950/30 px-3 sm:px-6 py-2 text-xs sm:text-sm text-cyan-100 lg:pointer-events-auto">
                 {warmupStatus}
               </div>
             </div>
@@ -582,7 +670,6 @@ export default function Page() {
               <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-300">
                 Modelo
               </span>
-              
             </div>
 
             <div className="relative">
@@ -609,10 +696,8 @@ export default function Page() {
             </div>
           </div>
         </div>
-
       </div>
 
-      {/* Chat Area */}
       <div className="relative flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 soft-scroll">
         <div className="mx-auto max-w-5xl space-y-4">
           {messages.map((msg) => (
@@ -645,6 +730,7 @@ export default function Page() {
                     />
                   </button>
                 )}
+
                 <p
                   className={`whitespace-pre-wrap wrap-break-word text-sm sm:text-base leading-relaxed ${
                     msg.type === "assistant" && !msg.isError && !msg.isWelcome && msg.content?.trim()
@@ -660,6 +746,7 @@ export default function Page() {
                     />
                   )}
                 </p>
+
                 {(msg.type === "assistant" && !msg.isError) || msg.latency ? (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     {msg.latency && (
@@ -690,16 +777,19 @@ export default function Page() {
               </div>
             </div>
           )}
+
           <div ref={chatEndRef} />
         </div>
       </div>
 
-      {/* Settings & Input Bar */}
       <div className="relative px-3 sm:px-6 py-3 sm:py-4 mb-2 sm:mb-3">
         <div className="relative mx-auto max-w-5xl">
           {showParamsMenu && (
             <div className="absolute bottom-full left-0 z-30 mb-3 w-[min(75vw,15rem)] translate-x-0 sm:w-fit max-w-[calc(100vw-1.5rem)] sm:max-w-[calc(100vw-3rem)] rounded-3xl border border-white/10 bg-slate-950/92 p-2 sm:p-3 shadow-[0_24px_80px_rgba(2,6,23,0.65)] backdrop-blur-xl">
-              <div ref={paramsMenuRef} className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-2 sm:gap-3">
+              <div
+                ref={paramsMenuRef}
+                className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-2 sm:gap-3"
+              >
                 <label className="flex w-full sm:w-auto min-w-0 sm:min-w-33 flex-col items-center gap-2 rounded-2xl bg-slate-900/60 px-3 py-3 text-center shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
                   <span className="w-full text-center text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
                     Beams
@@ -715,6 +805,7 @@ export default function Page() {
                     >
                       <span className="text-2xl leading-none symbol-hover">−</span>
                     </button>
+
                     <input
                       className="no-number-spinner h-8 w-16 bg-transparent text-center text-sm font-medium text-slate-100 outline-none"
                       type="text"
@@ -727,6 +818,7 @@ export default function Page() {
                       onBlur={() => setBeams(normalizeInteger(beams, 1, 8, DEFAULT_SETTINGS.beams))}
                       disabled={loading}
                     />
+
                     <button
                       type="button"
                       onClick={() =>
@@ -757,6 +849,7 @@ export default function Page() {
                     >
                       <span className="text-2xl leading-none symbol-hover">−</span>
                     </button>
+
                     <input
                       className="no-number-spinner h-8 w-16 bg-transparent text-center text-sm font-medium text-slate-100 outline-none"
                       type="text"
@@ -767,10 +860,13 @@ export default function Page() {
                       value={temperature}
                       onChange={(e) => handleTemperatureChange(e.target.value)}
                       onBlur={() =>
-                        setTemperature(normalizeFloat(temperature, 0.1, 1, DEFAULT_SETTINGS.temperature))
+                        setTemperature(
+                          normalizeFloat(temperature, 0.1, 1, DEFAULT_SETTINGS.temperature)
+                        )
                       }
                       disabled={loading}
                     />
+
                     <button
                       type="button"
                       onClick={() =>
@@ -779,7 +875,7 @@ export default function Page() {
                         )
                       }
                       disabled={loading}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-base font-semibold text-slate-200 transitiondisabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-base font-semibold text-slate-200 transition disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <span className="text-2xl leading-none symbol-hover">+</span>
                     </button>
@@ -797,10 +893,11 @@ export default function Page() {
                         setTopP((prev) => adjustFloat(prev, -0.1, 0.1, 1, DEFAULT_SETTINGS.topP))
                       }
                       disabled={loading}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-base font-semibold text-slate-200 transitiondisabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-base font-semibold text-slate-200 transition disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <span className="text-2xl leading-none symbol-hover">−</span>
                     </button>
+
                     <input
                       className="no-number-spinner h-8 w-16 bg-transparent text-center text-sm font-medium text-slate-100 outline-none"
                       type="text"
@@ -813,9 +910,12 @@ export default function Page() {
                       onBlur={() => setTopP(normalizeFloat(topP, 0.1, 1, DEFAULT_SETTINGS.topP))}
                       disabled={loading}
                     />
+
                     <button
                       type="button"
-                      onClick={() => setTopP((prev) => adjustFloat(prev, 0.1, 0.1, 1, DEFAULT_SETTINGS.topP))}
+                      onClick={() =>
+                        setTopP((prev) => adjustFloat(prev, 0.1, 0.1, 1, DEFAULT_SETTINGS.topP))
+                      }
                       disabled={loading}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-base font-semibold text-slate-200 transition disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -842,7 +942,10 @@ export default function Page() {
               {!isInputMultiline && (
                 <button
                   ref={paramsToggleRef}
-                  onClick={() => setShowParamsMenu((prev) => !prev)}
+                  onClick={() => {
+                    commitSettings();
+                    setShowParamsMenu((prev) => !prev);
+                  }}
                   disabled={loading}
                   className="self-end inline-flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-white/15 bg-slate-900/70 text-slate-100 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                   title={showParamsMenu ? "Ocultar parámetros" : "Mostrar parámetros"}
@@ -869,7 +972,10 @@ export default function Page() {
                 <div className="flex items-center justify-between px-1">
                   <button
                     ref={paramsToggleRef}
-                    onClick={() => setShowParamsMenu((prev) => !prev)}
+                    onClick={() => {
+                      commitSettings();
+                      setShowParamsMenu((prev) => !prev);
+                    }}
                     disabled={loading}
                     className="inline-flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-white/15 bg-slate-900/70 text-slate-100 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                     title={showParamsMenu ? "Ocultar parámetros" : "Mostrar parámetros"}
