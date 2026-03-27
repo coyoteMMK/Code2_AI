@@ -295,7 +295,7 @@ export default function Page() {
         // --- Petición HTTP directa para despertar el Space ---
         setWarmupStatus("⏳ Despertando servidor... Esto puede tardar unos segundos si el servidor está dormido.");
         try {
-          await fetch("https://coyoteMMK-code2-ai.hf.space/generar", {
+          await fetch("https://huggingface.co/spaces/coyoteMMK/Code2_AI", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
