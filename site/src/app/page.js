@@ -682,7 +682,7 @@ export default function Page() {
                         setBeams((prev) => adjustInteger(prev, -1, 1, 8, DEFAULT_SETTINGS.beams))
                       }
                       disabled={loading}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-base font-semibold text-slate-200 transition hover:bg-slate-700/70 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-base font-semibold text-slate-200 transition disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <span className="text-2xl leading-none symbol-hover">−</span>
                     </button>
