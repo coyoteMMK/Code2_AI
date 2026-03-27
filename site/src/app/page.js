@@ -316,9 +316,11 @@ export default function Page() {
         });
 
         // Petición dummy para forzar el arranque real
+        // Usar un input válido y simple
+        const dummyInput = "mov eax, 1";
         try {
           await client.predict(ENDPOINT, [
-            "warmup", // input de prueba
+            dummyInput,
             modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)",
             1, // beams mínimo
             0.2, // temperatura
