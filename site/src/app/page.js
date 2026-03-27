@@ -292,12 +292,10 @@ export default function Page() {
         setWarmupFadingOut(false);
         setWarmupStatus("Conectando con Hugging Face...");
 
-        await Client.connect(SPACE_ID, {
+        const client = await Client.connect(SPACE_ID, {
           status_callback: (status) => {
             if (cancelled) return;
-
             const stage = String(status?.stage ?? "").toLowerCase();
-
             if (
               stage.includes("sleep") ||
               stage.includes("paused") ||
@@ -310,13 +308,25 @@ export default function Page() {
               setWarmupStatus("⏳ El Space está dormido o arrancando. Lo estoy despertando...");
               return;
             }
-
             if (stage.includes("running") || stage.includes("connected")) {
               setReadyStatus();
               return;
             }
           },
         });
+
+        // Petición dummy para forzar el arranque real
+        try {
+          await client.predict(ENDPOINT, [
+            "warmup", // input de prueba
+            modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)",
+            1, // beams mínimo
+            0.2, // temperatura
+            0.6, // topP
+          ]);
+        } catch (e) {
+          // Ignorar errores de la petición dummy
+        }
 
         if (!cancelled) {
           setReadyStatus();
@@ -325,7 +335,7 @@ export default function Page() {
         if (!cancelled) {
           setWarmupVisible(true);
           setWarmupFadingOut(false);
-          setWarmupStatus("⚠️ No pude confirmar el estado del servidor, pero puedes intentar enviar una petición.");
+          setWarmupStatus("⚠️ No pude confirmar el estado del servidor.");
         }
       } finally {
         if (!cancelled) {
