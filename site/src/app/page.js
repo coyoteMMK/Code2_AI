@@ -770,7 +770,7 @@ export default function Page() {
                       disabled={loading}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-base font-semibold text-slate-200 transition hover:bg-slate-700/70 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      −
+                      <span className="text-2xl leading-none symbol-hover">−</span>
                     </button>
                     <input
                       className="no-number-spinner h-8 w-16 bg-transparent text-center text-sm font-medium text-slate-100 outline-none"
