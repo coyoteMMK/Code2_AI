@@ -292,10 +292,10 @@ export default function Page() {
         setWarmupFadingOut(false);
         setWarmupStatus("Conectando con Hugging Face...");
 
-        // --- Petición HTTP directa para despertar el Space ---
+        // --- Petición HTTP directa para despertar el Space (URL correcta) ---
         setWarmupStatus("⏳ Despertando servidor... Esto puede tardar unos segundos si el servidor está dormido.");
         try {
-          await fetch("https://huggingface.co/spaces/coyoteMMK/Code2_AI", {
+          await fetch("https://coyoteMMK-code2-ai.hf.space/api/predict/", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
