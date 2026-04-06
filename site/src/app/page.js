@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import { Client } from "@gradio/client";
 
 export default function Page() {
   const publicBasePath = "";
@@ -49,8 +50,8 @@ export default function Page() {
   const [showParamsMenu, setShowParamsMenu] = useState(false);
   const [isInputMultiline, setIsInputMultiline] = useState(false);
 
-  // En Vercel, la API route maneja la conexión al Space
-  const API_ENDPOINT = "/api/generate";
+  const SPACE_ID = useMemo(() => "coyoteMMK/Code2_AI", []);
+  const ENDPOINT = useMemo(() => "/generar", []);
 
   const normalizeInteger = (value, min, max, fallback) => {
     const parsed = Number.parseInt(String(value), 10);
@@ -105,47 +106,74 @@ export default function Page() {
     );
   };
 
-  async function callGenerateAPI(payload, setHint, maxAttempts = 6) {
+  async function connectWithRetry(spaceId, setHint, maxAttempts = 8) {
     let lastError;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        if (attempt === 1) {
-          setHint?.("Conectando con Hugging Face...");
-        } else {
-          setHint?.(`⏳ Esperando a que el Space esté listo... intento ${attempt}/${maxAttempts}`);
-        }
+        setHint?.(
+          attempt === 1
+            ? "Conectando con Hugging Face..."
+            : `Despertando servidor... intento ${attempt}/${maxAttempts}`
+        );
 
-        const response = await fetch(API_ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
+        const client = await Client.connect(spaceId, {
+          status_callback: (status) => {
+            const stage = String(status?.stage ?? "").toLowerCase();
+            const message = String(status?.message ?? "").trim();
+
+            if (
+              stage.includes("sleep") ||
+              stage.includes("building") ||
+              stage.includes("starting") ||
+              stage.includes("loading")
+            ) {
+              setHint?.("⏳ El servidor está arrancando. Esperando a que esté listo...");
+              return;
+            }
+
+            if (stage.includes("running") || stage.includes("connected")) {
+              setHint?.("Servidor activo. Generando respuesta...");
+              return;
+            }
+
+            if (message) {
+              setHint?.(message);
+            }
           },
-          body: JSON.stringify(payload),
         });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const errorMsg = errorData.error || `Error ${response.status}`;
+        return client;
+      } catch (error) {
+        lastError = error;
 
-          if (response.status === 503) {
-            // Space durmiendo o pausado, reintenta
-            lastError = new Error(errorMsg);
-            if (errorMsg.includes("pausado")) {
-              throw lastError; // Error no recuperable
-            }
-            if (attempt < maxAttempts) {
-              await sleep(Math.min(2000 * attempt, 8000));
-              continue;
-            }
-          }
-
-          throw new Error(errorMsg);
+        if (isOwnerPausedError(error)) {
+          throw error;
         }
 
-        const result = await response.json();
-        setHint?.("Servidor activo. Respuesta generada.");
-        return result;
+        if (!isRecoverableSpaceError(error) || attempt === maxAttempts) {
+          throw error;
+        }
+
+        await sleep(Math.min(2000 * attempt, 8000));
+      }
+    }
+
+    throw lastError;
+  }
+
+  async function predictWithRetry(client, endpoint, payload, setHint, maxAttempts = 6) {
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        if (attempt > 1) {
+          setHint?.(
+            `⏳ Esperando a que el modelo termine de arrancar... intento ${attempt}/${maxAttempts}`
+          );
+        }
+
+        return await client.predict(endpoint, payload);
       } catch (error) {
         lastError = error;
 
@@ -378,17 +406,40 @@ export default function Page() {
         setWarmupFadingOut(false);
         setWarmupStatus("Conectando con Hugging Face...");
 
-        // Llamada mínima para despertar el Space
-        try {
-          const response = await fetch(`${API_ENDPOINT}?action=warmup`, {
-            method: "GET",
-          });
+        const client = await connectWithRetry(
+          SPACE_ID,
+          (msg) => {
+            if (!cancelled) {
+              setWarmupVisible(true);
+              setWarmupFadingOut(false);
+              setWarmupStatus(msg);
+            }
+          },
+          8
+        );
 
-          if (!response.ok && response.status !== 503) {
-            throw new Error(`Warmup failed: ${response.status}`);
-          }
+        try {
+          await predictWithRetry(
+            client,
+            ENDPOINT,
+            [
+              "mov eax, 1",
+              modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)",
+              1,
+              0.2,
+              0.6,
+            ],
+            (msg) => {
+              if (!cancelled) {
+                setWarmupVisible(true);
+                setWarmupFadingOut(false);
+                setWarmupStatus(msg);
+              }
+            },
+            6
+          );
         } catch {
-          // No bloqueamos la UI si falla el warmup
+          // No bloqueamos la UI si falla el warmup dummy.
         }
 
         if (!cancelled) {
@@ -426,7 +477,8 @@ export default function Page() {
       clearTimeout(hideReadyMessageTimer);
       clearTimeout(fadeOutTimer);
     };
-  }, [modelChoice]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [SPACE_ID, ENDPOINT, modelChoice]);
 
   const resetSettings = () => {
     setModelChoice(DEFAULT_SETTINGS.modelChoice);
@@ -474,7 +526,7 @@ export default function Page() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
-    setLoadingHint("Conectando...");
+    setLoadingHint("Conectando con Hugging Face...");
     setServerPaused(false);
     setDisplayedOutput("");
     setFullOutput("");
@@ -483,25 +535,27 @@ export default function Page() {
     try {
       const t0 = performance.now();
 
-      const modelo_sel =
-        modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)";
-
-      const result = await callGenerateAPI(
-        {
-          input: userPrompt,
-          modelChoice,
-          beams: requestBeams,
-          temperature: requestTemperature,
-          topP: requestTopP,
-        },
+      const client = await connectWithRetry(
+        SPACE_ID,
         (msg) => {
           setLoadingHint(msg);
-          if (/arrancando|despertando|esperando|durmiendo/i.test(msg)) {
+          if (/arrancando|despertando|esperando/i.test(msg)) {
             setServerPaused(true);
           } else {
             setServerPaused(false);
           }
         },
+        8
+      );
+
+      const modelo_sel =
+        modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)";
+
+      const result = await predictWithRetry(
+        client,
+        ENDPOINT,
+        [userPrompt, modelo_sel, requestBeams, requestTemperature, requestTopP],
+        (msg) => setLoadingHint(msg),
         6
       );
 
@@ -535,9 +589,9 @@ export default function Page() {
       const isRecoverable = isRecoverableSpaceError(e);
 
       const errorMsg = isOwnerPaused
-        ? "⚠️ Space en pausa en HF."
+        ? "⚠️ El Space está pausado por el owner en Hugging Face. Hay que darle a Restart allí o reiniciarlo desde un backend con token."
         : isRecoverable
-        ? "⏳ Space iniciando. Intenta de nuevo."
+        ? "⏳ El Space estaba arrancando pero no llegó a estar listo a tiempo. Intenta otra vez en unos segundos."
         : "❌ Error: " + rawError;
 
       setMessages((prev) => [
@@ -551,7 +605,7 @@ export default function Page() {
       ]);
     } finally {
       setLoading(false);
-      setLoadingHint("Generando...");
+      setLoadingHint("Generando respuesta...");
       setServerPaused(false);
     }
   }
