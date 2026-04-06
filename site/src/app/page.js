@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
 export default function Page() {
-  const publicBasePath = process.env.NODE_ENV === "production" ? "/Code2_AI" : "";
+  const publicBasePath = "";
   const WELCOME_TEXT =
     "Hola! 👋 Soy Code-2 Translator. Cuéntame qué instrucciones quieres convertir a ensamblador.";
   const DEFAULT_SETTINGS = {
