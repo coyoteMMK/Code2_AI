@@ -1,3 +1,21 @@
+const DEFAULT_HF_SPACE_URL = "https://coyoteMMK-Code2_AI.hf.space/api/predict";
+
+function getSpaceUrl() {
+  return process.env.HF_SPACE_URL || DEFAULT_HF_SPACE_URL;
+}
+
+function getAuthHeaders() {
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  if (process.env.HF_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.HF_TOKEN}`;
+  }
+
+  return headers;
+}
+
 export async function POST(request) {
   try {
     const { input, modelChoice, beams, temperature, topP } = await request.json();
@@ -18,15 +36,13 @@ export async function POST(request) {
     // Payload para el Space de Hugging Face
     const hfPayload = [input, modelo_sel, beams, temperature, topP];
 
-    // URL del Space (público, no necesita token)
-    const spaceUrl = "https://coyoteMMK-Code2_AI.hf.space/api/predict";
+    // URL del Space configurable desde Vercel
+    const spaceUrl = getSpaceUrl();
 
     // Hacer la petición al Space
     const response = await fetch(spaceUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ data: hfPayload }),
     });
 
@@ -71,13 +87,11 @@ export async function GET(request) {
 
     if (action === "warmup") {
       // Llamada mínima para despertar el Space
-      const spaceUrl = "https://coyoteMMK-Code2_AI.hf.space/api/predict";
+      const spaceUrl = getSpaceUrl();
 
       const response = await fetch(spaceUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           data: ["mov eax, 1", "Full FP32 (más preciso)", 1, 0.2, 0.6],
         }),
