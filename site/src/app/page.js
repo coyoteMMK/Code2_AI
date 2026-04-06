@@ -20,10 +20,10 @@ export default function Page() {
   const [fullOutput, setFullOutput] = useState("");
   const [latency, setLatency] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [loadingHint, setLoadingHint] = useState("Generando respuesta...");
+  const [loadingHint, setLoadingHint] = useState("Generando...");
   const [serverPaused, setServerPaused] = useState(false);
   const [warmingUp, setWarmingUp] = useState(true);
-  const [warmupStatus, setWarmupStatus] = useState("Preparando servidor...");
+  const [warmupStatus, setWarmupStatus] = useState("Preparando...");
   const [warmupVisible, setWarmupVisible] = useState(true);
   const [warmupFadingOut, setWarmupFadingOut] = useState(false);
   const [typingMessageId, setTypingMessageId] = useState(null);
@@ -113,8 +113,8 @@ export default function Page() {
       try {
         setHint?.(
           attempt === 1
-            ? "Conectando con Hugging Face..."
-            : `Despertando servidor... intento ${attempt}/${maxAttempts}`
+            ? "Conectando..."
+            : `Iniciando... ${attempt}/${maxAttempts}`
         );
 
         const client = await Client.connect(spaceId, {
@@ -128,12 +128,12 @@ export default function Page() {
               stage.includes("starting") ||
               stage.includes("loading")
             ) {
-              setHint?.("⏳ El servidor está arrancando. Esperando a que esté listo...");
+              setHint?.("⏳ Iniciando servidor...");
               return;
             }
 
             if (stage.includes("running") || stage.includes("connected")) {
-              setHint?.("Servidor activo. Generando respuesta...");
+              setHint?.("Servidor listo");
               return;
             }
 
@@ -155,7 +155,7 @@ export default function Page() {
           throw error;
         }
 
-        setHint?.("⏳ El Space todavía no está listo. Reintentando...");
+        setHint?.("⏳ Aún no listo. Reintentando...");
         await sleep(Math.min(2000 * attempt, 8000));
       }
     }
@@ -169,7 +169,7 @@ export default function Page() {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         if (attempt > 1) {
-          setHint?.(`⏳ Esperando a que el modelo termine de arrancar... intento ${attempt}/${maxAttempts}`);
+          setHint?.(`⏳ Cargando modelo... ${attempt}/${maxAttempts}`);
         }
 
         return await client.predict(endpoint, payload);
@@ -380,7 +380,7 @@ export default function Page() {
       if (cancelled) return;
       setWarmupVisible(true);
       setWarmupFadingOut(false);
-      setWarmupStatus("✅ Servidor listo para responder.");
+      setWarmupStatus("✅ Servidor listo");
       clearTimeout(hideReadyMessageTimer);
       clearTimeout(fadeOutTimer);
 
@@ -403,7 +403,7 @@ export default function Page() {
         setWarmingUp(true);
         setWarmupVisible(true);
         setWarmupFadingOut(false);
-        setWarmupStatus("Conectando con Hugging Face...");
+        setWarmupStatus("Conectando...");
 
         const client = await connectWithRetry(
           SPACE_ID,
@@ -450,13 +450,13 @@ export default function Page() {
             setWarmupVisible(true);
             setWarmupFadingOut(false);
             setWarmupStatus(
-              "⚠️ El Space está pausado por el owner. Hay que reiniciarlo en Hugging Face."
+              "⚠️ Space en pausa. Reinícialo en HF."
             );
           } else {
             setWarmupVisible(true);
             setWarmupFadingOut(false);
             setWarmupStatus(
-              "⚠️ No pude confirmar el estado del servidor. Se reintentará al enviar una consulta."
+              "⚠️ Estado no disponible. Reintenta."
             );
           }
         }
@@ -524,7 +524,7 @@ export default function Page() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
-    setLoadingHint("Conectando con Hugging Face...");
+    setLoadingHint("Conectando...");
     setServerPaused(false);
     setDisplayedOutput("");
     setFullOutput("");
@@ -587,9 +587,9 @@ export default function Page() {
       const isRecoverable = isRecoverableSpaceError(e);
 
       const errorMsg = isOwnerPaused
-        ? "⚠️ El Space está pausado por el owner en Hugging Face. Hay que darle a Restart allí o reiniciarlo desde un backend con token."
+        ? "⚠️ Space en pausa en HF."
         : isRecoverable
-        ? "⏳ El Space estaba arrancando pero no llegó a estar listo a tiempo. Intenta otra vez en unos segundos."
+        ? "⏳ Space iniciando. Intenta de nuevo."
         : "❌ Error: " + rawError;
 
       setMessages((prev) => [
@@ -603,7 +603,7 @@ export default function Page() {
       ]);
     } finally {
       setLoading(false);
-      setLoadingHint("Generando respuesta...");
+      setLoadingHint("Generando...");
       setServerPaused(false);
     }
   }
@@ -636,7 +636,7 @@ export default function Page() {
   };
 
   return (
-    <main className="relative flex min-h-dvh flex-col bg-linear-to-br from-slate-950 via-slate-900 to-stone-900 text-slate-100">
+    <main className="relative flex h-dvh flex-col overflow-hidden bg-linear-to-br from-slate-950 via-slate-900 to-stone-900 text-slate-100">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(75%_60%_at_20%_0%,rgba(148,163,184,0.12),transparent_70%)]" />
 
       <div className="relative border-b border-white/10 bg-black/40 px-3 py-3 sm:px-6 sm:py-4 backdrop-blur">
@@ -698,7 +698,7 @@ export default function Page() {
         </div>
       </div>
 
-      <div className="relative flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 soft-scroll">
+      <div className="relative min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 soft-scroll">
         <div className="mx-auto max-w-5xl space-y-4">
           {messages.map((msg) => (
             <div
@@ -782,7 +782,7 @@ export default function Page() {
         </div>
       </div>
 
-      <div className="relative px-3 sm:px-6 py-3 sm:py-4 mb-2 sm:mb-3">
+      <div className="relative px-3 pb-3 sm:px-6 sm:pb-4">
         <div className="relative mx-auto max-w-5xl">
           {showParamsMenu && (
             <div className="absolute bottom-full left-0 z-30 mb-3 w-[min(75vw,15rem)] translate-x-0 sm:w-fit max-w-[calc(100vw-1.5rem)] sm:max-w-[calc(100vw-3rem)] rounded-3xl border border-white/10 bg-slate-950/92 p-2 sm:p-3 shadow-[0_24px_80px_rgba(2,6,23,0.65)] backdrop-blur-xl">
