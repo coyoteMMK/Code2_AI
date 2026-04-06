@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { Client } from "@gradio/client";
 
 export default function Page() {
   const publicBasePath = process.env.NODE_ENV === "production" ? "/Code2_AI" : "";
@@ -50,8 +49,8 @@ export default function Page() {
   const [showParamsMenu, setShowParamsMenu] = useState(false);
   const [isInputMultiline, setIsInputMultiline] = useState(false);
 
-  const SPACE_ID = useMemo(() => "coyoteMMK/Code2_AI", []);
-  const ENDPOINT = useMemo(() => "/generar", []);
+  // En Vercel, la API route maneja la conexión al Space
+  const API_ENDPOINT = "/api/generate";
 
   const normalizeInteger = (value, min, max, fallback) => {
     const parsed = Number.parseInt(String(value), 10);
@@ -106,73 +105,47 @@ export default function Page() {
     );
   };
 
-  async function connectWithRetry(spaceId, setHint, maxAttempts = 8) {
+  async function callGenerateAPI(payload, setHint, maxAttempts = 6) {
     let lastError;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        setHint?.(
-          attempt === 1
-            ? "Conectando..."
-            : `Iniciando... ${attempt}/${maxAttempts}`
-        );
+        if (attempt === 1) {
+          setHint?.("Conectando con Hugging Face...");
+        } else {
+          setHint?.(`⏳ Esperando a que el Space esté listo... intento ${attempt}/${maxAttempts}`);
+        }
 
-        const client = await Client.connect(spaceId, {
-          status_callback: (status) => {
-            const stage = String(status?.stage ?? "").toLowerCase();
-            const message = String(status?.message ?? "").trim();
-
-            if (
-              stage.includes("sleep") ||
-              stage.includes("building") ||
-              stage.includes("starting") ||
-              stage.includes("loading")
-            ) {
-              setHint?.("⏳ Iniciando servidor...");
-              return;
-            }
-
-            if (stage.includes("running") || stage.includes("connected")) {
-              setHint?.("Servidor listo");
-              return;
-            }
-
-            if (message) {
-              setHint?.(message);
-            }
+        const response = await fetch(API_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
+          body: JSON.stringify(payload),
         });
 
-        return client;
-      } catch (error) {
-        lastError = error;
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const errorMsg = errorData.error || `Error ${response.status}`;
 
-        if (isOwnerPausedError(error)) {
-          throw error;
+          if (response.status === 503) {
+            // Space durmiendo o pausado, reintenta
+            lastError = new Error(errorMsg);
+            if (errorMsg.includes("pausado")) {
+              throw lastError; // Error no recuperable
+            }
+            if (attempt < maxAttempts) {
+              await sleep(Math.min(2000 * attempt, 8000));
+              continue;
+            }
+          }
+
+          throw new Error(errorMsg);
         }
 
-        if (!isRecoverableSpaceError(error) || attempt === maxAttempts) {
-          throw error;
-        }
-
-        setHint?.("⏳ Aún no listo. Reintentando...");
-        await sleep(Math.min(2000 * attempt, 8000));
-      }
-    }
-
-    throw lastError;
-  }
-
-  async function predictWithRetry(client, endpoint, payload, setHint, maxAttempts = 6) {
-    let lastError;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        if (attempt > 1) {
-          setHint?.(`⏳ Cargando modelo... ${attempt}/${maxAttempts}`);
-        }
-
-        return await client.predict(endpoint, payload);
+        const result = await response.json();
+        setHint?.("Servidor activo. Respuesta generada.");
+        return result;
       } catch (error) {
         lastError = error;
 
@@ -403,42 +376,19 @@ export default function Page() {
         setWarmingUp(true);
         setWarmupVisible(true);
         setWarmupFadingOut(false);
-        setWarmupStatus("Conectando...");
+        setWarmupStatus("Conectando con Hugging Face...");
 
-        const client = await connectWithRetry(
-          SPACE_ID,
-          (msg) => {
-            if (!cancelled) {
-              setWarmupVisible(true);
-              setWarmupFadingOut(false);
-              setWarmupStatus(msg);
-            }
-          },
-          8
-        );
-
+        // Llamada mínima para despertar el Space
         try {
-          await predictWithRetry(
-            client,
-            ENDPOINT,
-            [
-              "mov eax, 1",
-              modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)",
-              1,
-              0.2,
-              0.6,
-            ],
-            (msg) => {
-              if (!cancelled) {
-                setWarmupVisible(true);
-                setWarmupFadingOut(false);
-                setWarmupStatus(msg);
-              }
-            },
-            6
-          );
+          const response = await fetch(`${API_ENDPOINT}?action=warmup`, {
+            method: "GET",
+          });
+
+          if (!response.ok && response.status !== 503) {
+            throw new Error(`Warmup failed: ${response.status}`);
+          }
         } catch {
-          // No bloqueamos la UI si falla el warmup dummy.
+          // No bloqueamos la UI si falla el warmup
         }
 
         if (!cancelled) {
@@ -450,13 +400,13 @@ export default function Page() {
             setWarmupVisible(true);
             setWarmupFadingOut(false);
             setWarmupStatus(
-              "⚠️ Space en pausa. Reinícialo en HF."
+              "⚠️ El Space está pausado por el owner. Hay que reiniciarlo en Hugging Face."
             );
           } else {
             setWarmupVisible(true);
             setWarmupFadingOut(false);
             setWarmupStatus(
-              "⚠️ Estado no disponible. Reintenta."
+              "⚠️ No pude confirmar el estado del servidor. Se reintentará al enviar una consulta."
             );
           }
         }
@@ -476,7 +426,7 @@ export default function Page() {
       clearTimeout(hideReadyMessageTimer);
       clearTimeout(fadeOutTimer);
     };
-  }, [SPACE_ID, ENDPOINT, modelChoice]);
+  }, [modelChoice]);
 
   const resetSettings = () => {
     setModelChoice(DEFAULT_SETTINGS.modelChoice);
@@ -533,27 +483,25 @@ export default function Page() {
     try {
       const t0 = performance.now();
 
-      const client = await connectWithRetry(
-        SPACE_ID,
+      const modelo_sel =
+        modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)";
+
+      const result = await callGenerateAPI(
+        {
+          input: userPrompt,
+          modelChoice,
+          beams: requestBeams,
+          temperature: requestTemperature,
+          topP: requestTopP,
+        },
         (msg) => {
           setLoadingHint(msg);
-          if (/arrancando|despertando|esperando/i.test(msg)) {
+          if (/arrancando|despertando|esperando|durmiendo/i.test(msg)) {
             setServerPaused(true);
           } else {
             setServerPaused(false);
           }
         },
-        8
-      );
-
-      const modelo_sel =
-        modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)";
-
-      const result = await predictWithRetry(
-        client,
-        ENDPOINT,
-        [userPrompt, modelo_sel, requestBeams, requestTemperature, requestTopP],
-        (msg) => setLoadingHint(msg),
         6
       );
 

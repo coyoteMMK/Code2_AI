@@ -1,12 +1,15 @@
-const isProd = process.env.NODE_ENV === "production";
+const isVercel = process.env.VERCEL === "1";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "export",
+  // En Vercel: modo server (más seguro para API routes)
+  // En desarrollo: modo normal
+  // Para exportar estático (e.g. GitHub Pages): output: "export"
+  
   images: { unoptimized: true },
-  trailingSlash: true,
-  ...(isProd ? { basePath: "/Code2_AI", assetPrefix: "/Code2_AI/" } : {}),
-  allowedDevOrigins: ["http://192.168.100.83:3000"],
+  trailingSlash: false,
+  allowedDevOrigins: ["http://192.168.100.83:3000", "localhost:3000"],
+  outputFileTracingRoot: process.cwd(),
 };
 
 export default nextConfig;
