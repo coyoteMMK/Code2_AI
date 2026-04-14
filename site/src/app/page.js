@@ -381,7 +381,7 @@ export default function Page() {
       clearTimeout(fadeOutTimer);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [SPACE_ID, ENDPOINT, modelChoice]);
+  }, [modelChoice]);
 
   const resetSettings = () => {
     setModelChoice(DEFAULT_SETTINGS.modelChoice);
