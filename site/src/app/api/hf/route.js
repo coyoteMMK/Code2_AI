@@ -12,6 +12,8 @@ const DEFAULT_TEMPERATURE = 0.2;
 const DEFAULT_TOP_P = 0.6;
 const HF_TOKEN = process.env.HF_TOKEN;
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function connectSpaceClient() {
   const references = [SPACE_ID, SPACE_URL];
   let lastError;
@@ -56,6 +58,47 @@ function normalizeProxyError(error) {
   };
 }
 
+function isRecoverableProxyError(error) {
+  const message = String(error?.message ?? error ?? "").toLowerCase();
+
+  return (
+    message.includes("could not resolve app config") ||
+    message.includes("sleep") ||
+    message.includes("sleeping") ||
+    message.includes("loading") ||
+    message.includes("building") ||
+    message.includes("starting") ||
+    message.includes("space is not ready") ||
+    message.includes("fetch failed") ||
+    message.includes("not healthy") ||
+    message.includes("runtime error") ||
+    message.includes("connection refused") ||
+    message.includes("503")
+  );
+}
+
+async function predictWithRetry(payload, maxAttempts) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const client = await connectSpaceClient();
+      const result = await client.predict(ENDPOINT, payload);
+      return { result, attempts: attempt };
+    } catch (error) {
+      lastError = error;
+
+      if (!isRecoverableProxyError(error) || attempt === maxAttempts) {
+        break;
+      }
+
+      await sleep(Math.min(1500 * attempt, 6000));
+    }
+  }
+
+  throw lastError ?? new Error("No se pudo completar la inferencia tras reintentos");
+}
+
 export async function POST(request) {
   let body = {};
 
@@ -72,23 +115,25 @@ export async function POST(request) {
   const beams = Number.isFinite(body?.beams) ? body.beams : DEFAULT_BEAMS;
   const temperature = Number.isFinite(body?.temperature) ? body.temperature : DEFAULT_TEMPERATURE;
   const topP = Number.isFinite(body?.topP) ? body.topP : DEFAULT_TOP_P;
+  const payload = [
+    prompt,
+    modelLabel,
+    beams,
+    temperature,
+    topP,
+  ];
+  const maxAttempts = warmup ? 3 : 6;
 
   const startedAt = Date.now();
 
   try {
-    const client = await connectSpaceClient();
-    const result = await client.predict(ENDPOINT, [
-      prompt,
-      modelLabel,
-      beams,
-      temperature,
-      topP,
-    ]);
+    const { result, attempts } = await predictWithRetry(payload, maxAttempts);
 
     return NextResponse.json({
       ok: true,
       data: result?.data ?? [],
       latency: `${((Date.now() - startedAt) / 1000).toFixed(3)}s`,
+      attempts,
       warmup,
     });
   } catch (error) {
@@ -97,7 +142,7 @@ export async function POST(request) {
     return NextResponse.json(
       {
         ok: false,
-        error: mappedError.error,
+        error: `${mappedError.error} (reintentos agotados: ${maxAttempts})`,
         warmup,
       },
       { status: mappedError.status }
