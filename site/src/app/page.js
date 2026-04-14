@@ -104,6 +104,11 @@ export default function Page() {
     );
   };
 
+  const isAppConfigError = (error) => {
+    const msg = String(error?.message ?? error ?? "").toLowerCase();
+    return msg.includes("could not resolve app config") || msg.includes("configuración válida de gradio");
+  };
+
   async function callHfProxy(payload) {
     const response = await fetch(API_ROUTE, {
       method: "POST",
@@ -336,17 +341,26 @@ export default function Page() {
         setWarmupFadingOut(false);
         setWarmupStatus("Conectando con Hugging Face...");
 
+        let warmupSucceeded = false;
+
         try {
           await callHfProxy({
             warmup: true,
             modelChoice,
           });
+          warmupSucceeded = true;
         } catch {
           // No bloqueamos la UI si falla el warmup dummy.
         }
 
-        if (!cancelled) {
+        if (!cancelled && warmupSucceeded) {
           setReadyStatus();
+        } else if (!cancelled) {
+          setWarmupVisible(true);
+          setWarmupFadingOut(false);
+          setWarmupStatus(
+            "⚠️ El servidor no está listo todavía. Se reintentará automáticamente al enviar tu consulta."
+          );
         }
       } catch (e) {
         if (!cancelled) {
@@ -474,9 +488,12 @@ export default function Page() {
       const rawError = String(e?.message ?? e ?? "");
       const isOwnerPaused = isOwnerPausedError(e);
       const isRecoverable = isRecoverableSpaceError(e);
+      const isConfigError = isAppConfigError(e);
 
       const errorMsg = isOwnerPaused
         ? "⚠️ El Space está pausado por el owner en Hugging Face. Hay que darle a Restart allí o reiniciarlo desde un backend con token."
+        : isConfigError
+        ? "⚠️ El Space no está devolviendo una configuración válida de Gradio (normalmente porque está caído o en error de arranque). Revísalo en Hugging Face y reinícialo."
         : isRecoverable
         ? "⏳ El Space estaba arrancando pero no llegó a estar listo a tiempo. Intenta otra vez en unos segundos."
         : "❌ Error: " + rawError;
