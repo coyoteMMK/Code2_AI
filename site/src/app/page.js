@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { Client } from "@gradio/client";
 
 export default function Page() {
   const publicBasePath = "";
@@ -50,8 +49,7 @@ export default function Page() {
   const [showParamsMenu, setShowParamsMenu] = useState(false);
   const [isInputMultiline, setIsInputMultiline] = useState(false);
 
-  const SPACE_ID = useMemo(() => "coyoteMMK/Code2_AI", []);
-  const ENDPOINT = useMemo(() => "/generar", []);
+  const API_ROUTE = useMemo(() => "/api/hf", []);
 
   const normalizeInteger = (value, min, max, fallback) => {
     const parsed = Number.parseInt(String(value), 10);
@@ -106,90 +104,22 @@ export default function Page() {
     );
   };
 
-  async function connectWithRetry(spaceId, setHint, maxAttempts = 8) {
-    let lastError;
+  async function callHfProxy(payload) {
+    const response = await fetch(API_ROUTE, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        setHint?.(
-          attempt === 1
-            ? "Conectando con Hugging Face..."
-            : `Despertando servidor... intento ${attempt}/${maxAttempts}`
-        );
+    const result = await response.json().catch(() => ({}));
 
-        const client = await Client.connect(spaceId, {
-          status_callback: (status) => {
-            const stage = String(status?.stage ?? "").toLowerCase();
-            const message = String(status?.message ?? "").trim();
-
-            if (
-              stage.includes("sleep") ||
-              stage.includes("building") ||
-              stage.includes("starting") ||
-              stage.includes("loading")
-            ) {
-              setHint?.("⏳ El servidor está arrancando. Esperando a que esté listo...");
-              return;
-            }
-
-            if (stage.includes("running") || stage.includes("connected")) {
-              setHint?.("Servidor activo. Generando respuesta...");
-              return;
-            }
-
-            if (message) {
-              setHint?.(message);
-            }
-          },
-        });
-
-        return client;
-      } catch (error) {
-        lastError = error;
-
-        if (isOwnerPausedError(error)) {
-          throw error;
-        }
-
-        if (!isRecoverableSpaceError(error) || attempt === maxAttempts) {
-          throw error;
-        }
-
-        await sleep(Math.min(2000 * attempt, 8000));
-      }
+    if (!response.ok || !result?.ok) {
+      throw new Error(result?.error ?? `HTTP ${response.status}`);
     }
 
-    throw lastError;
-  }
-
-  async function predictWithRetry(client, endpoint, payload, setHint, maxAttempts = 6) {
-    let lastError;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        if (attempt > 1) {
-          setHint?.(
-            `⏳ Esperando a que el modelo termine de arrancar... intento ${attempt}/${maxAttempts}`
-          );
-        }
-
-        return await client.predict(endpoint, payload);
-      } catch (error) {
-        lastError = error;
-
-        if (isOwnerPausedError(error)) {
-          throw error;
-        }
-
-        if (!isRecoverableSpaceError(error) || attempt === maxAttempts) {
-          throw error;
-        }
-
-        await sleep(Math.min(2000 * attempt, 8000));
-      }
-    }
-
-    throw lastError;
+    return result;
   }
 
   const handleBeamsChange = (rawValue) => {
@@ -406,38 +336,11 @@ export default function Page() {
         setWarmupFadingOut(false);
         setWarmupStatus("Conectando con Hugging Face...");
 
-        const client = await connectWithRetry(
-          SPACE_ID,
-          (msg) => {
-            if (!cancelled) {
-              setWarmupVisible(true);
-              setWarmupFadingOut(false);
-              setWarmupStatus(msg);
-            }
-          },
-          8
-        );
-
         try {
-          await predictWithRetry(
-            client,
-            ENDPOINT,
-            [
-              "mov eax, 1",
-              modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)",
-              1,
-              0.2,
-              0.6,
-            ],
-            (msg) => {
-              if (!cancelled) {
-                setWarmupVisible(true);
-                setWarmupFadingOut(false);
-                setWarmupStatus(msg);
-              }
-            },
-            6
-          );
+          await callHfProxy({
+            warmup: true,
+            modelChoice,
+          });
         } catch {
           // No bloqueamos la UI si falla el warmup dummy.
         }
@@ -534,30 +437,13 @@ export default function Page() {
 
     try {
       const t0 = performance.now();
-
-      const client = await connectWithRetry(
-        SPACE_ID,
-        (msg) => {
-          setLoadingHint(msg);
-          if (/arrancando|despertando|esperando/i.test(msg)) {
-            setServerPaused(true);
-          } else {
-            setServerPaused(false);
-          }
-        },
-        8
-      );
-
-      const modelo_sel =
-        modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)";
-
-      const result = await predictWithRetry(
-        client,
-        ENDPOINT,
-        [userPrompt, modelo_sel, requestBeams, requestTemperature, requestTopP],
-        (msg) => setLoadingHint(msg),
-        6
-      );
+      const result = await callHfProxy({
+        prompt: userPrompt,
+        modelChoice,
+        beams: requestBeams,
+        temperature: requestTemperature,
+        topP: requestTopP,
+      });
 
       const t1 = performance.now();
 
@@ -565,6 +451,7 @@ export default function Page() {
       const tiempoStr = String(result?.data?.[1] ?? "");
       const parsed = parseFloat(tiempoStr.replace("s", "").trim());
       const finalLatency = !Number.isNaN(parsed) ? parsed : (t1 - t0) / 1000;
+      const modelo_sel = modelChoice === "onnx" ? "ONNX INT8 (rápido)" : "Full FP32 (más preciso)";
 
       const assistantMessageId = userMessageId + 1;
 
