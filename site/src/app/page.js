@@ -498,6 +498,7 @@ export default function Page() {
       const isOwnerPaused = isOwnerPausedError(e);
       const isRecoverable = isRecoverableSpaceError(e);
       const isConfigError = isAppConfigError(e);
+      const showWithTyping = isOwnerPaused || isConfigError;
 
       const errorMsg = isOwnerPaused
         ? "⚠️ El Space está pausado por el owner en Hugging Face. Hay que darle a Restart allí o reiniciarlo desde un backend con token."
@@ -508,23 +509,37 @@ export default function Page() {
         : "❌ Error: " + rawError;
 
       const assistantMessageId = userMessageId + 1;
-      
-      // Guardar la URL del Space si falla la conexión
-      if (e?.spaceUrl) {
-        setLastErrorSpaceUrl(e.spaceUrl);
-      }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: assistantMessageId,
-          type: "assistant",
-          content: errorMsg,
-          isError: !isRecoverable,
-          spaceUrl: e?.spaceUrl,
-          isOwnerPaused: isOwnerPaused || isConfigError,
-        },
-      ]);
+      if (showWithTyping) {
+        // Mostrar error con efecto typing como un mensaje de IA
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            type: "assistant",
+            content: "",
+            isTyping: true,
+            isError: false,
+            spaceUrl: e?.spaceUrl,
+            isOwnerPaused: true,
+          },
+        ]);
+        setTypingMessageId(assistantMessageId);
+        setFullOutput(errorMsg);
+      } else {
+        // Mostrar error sin typing (mensaje instantáneo)
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMessageId,
+            type: "assistant",
+            content: errorMsg,
+            isError: !isRecoverable,
+            spaceUrl: e?.spaceUrl,
+            isOwnerPaused: false,
+          },
+        ]);
+      }
     } finally {
       setLoading(false);
       setLoadingHint("Generando respuesta...");
@@ -671,22 +686,25 @@ export default function Page() {
                   )}
                 </p>
 
-                {(msg.type === "assistant" && !msg.isError) || msg.latency || msg.isOwnerPaused ? (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                {msg.isOwnerPaused && msg.spaceUrl && !msg.isTyping && (
+                  <div className="mt-4 pt-4 border-t border-amber-400/30">
+                    <a
+                      href={msg.spaceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600/80 hover:bg-amber-600 text-white text-xs sm:text-sm font-medium transition-colors"
+                    >
+                      🚀 Reiniciar en Hugging Face
+                    </a>
+                  </div>
+                )}
+
+                {(msg.type === "assistant" && !msg.isError) || msg.latency ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     {msg.latency && (
                       <p className="text-xs sm:text-sm text-slate-400">
                         ⏱ {msg.latency.toFixed(3)}s • {msg.model}
                       </p>
-                    )}
-                    {msg.isOwnerPaused && msg.spaceUrl && (
-                      <a
-                        href={msg.spaceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600/80 hover:bg-amber-600 text-white text-xs sm:text-sm font-medium transition-colors"
-                      >
-                        🚀 Reiniciar en Hugging Face
-                      </a>
                     )}
                   </div>
                 ) : null}

@@ -146,7 +146,7 @@ export async function POST(request) {
     return NextResponse.json(
       {
         ok: false,
-        error: `${mappedError.error} (reintentos agotados: ${maxAttempts})`,
+        error: mappedError.error,
         isOwnerPaused,
         spaceUrl: SPACE_URL,
         spaceId: SPACE_ID,
