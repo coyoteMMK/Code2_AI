@@ -27,6 +27,7 @@ export default function Page() {
   const [warmupFadingOut, setWarmupFadingOut] = useState(false);
   const [typingMessageId, setTypingMessageId] = useState(null);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
+  const [lastErrorSpaceUrl, setLastErrorSpaceUrl] = useState(null);
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -121,7 +122,11 @@ export default function Page() {
     const result = await response.json().catch(() => ({}));
 
     if (!response.ok || !result?.ok) {
-      throw new Error(result?.error ?? `HTTP ${response.status}`);
+      const error = new Error(result?.error ?? `HTTP ${response.status}`);
+      // Adjuntar métadata del error
+      error.spaceUrl = result?.spaceUrl;
+      error.isOwnerPaused = result?.isOwnerPaused;
+      throw error;
     }
 
     return result;
@@ -349,7 +354,11 @@ export default function Page() {
             modelChoice,
           });
           warmupSucceeded = true;
-        } catch {
+        } catch (error) {
+          // Guardar URL del Space si hay error
+          if (error?.spaceUrl) {
+            setLastErrorSpaceUrl(error.spaceUrl);
+          }
           // No bloqueamos la UI si falla el warmup dummy.
         }
 
@@ -498,13 +507,22 @@ export default function Page() {
         ? "⏳ El Space estaba arrancando pero no llegó a estar listo a tiempo. Intenta otra vez en unos segundos."
         : "❌ Error: " + rawError;
 
+      const assistantMessageId = userMessageId + 1;
+      
+      // Guardar la URL del Space si falla la conexión
+      if (e?.spaceUrl) {
+        setLastErrorSpaceUrl(e.spaceUrl);
+      }
+
       setMessages((prev) => [
         ...prev,
         {
-          id: userMessageId + 1,
+          id: assistantMessageId,
           type: "assistant",
           content: errorMsg,
           isError: !isRecoverable,
+          spaceUrl: e?.spaceUrl,
+          isOwnerPaused: isOwnerPaused || isConfigError,
         },
       ]);
     } finally {
@@ -653,12 +671,22 @@ export default function Page() {
                   )}
                 </p>
 
-                {(msg.type === "assistant" && !msg.isError) || msg.latency ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                {(msg.type === "assistant" && !msg.isError) || msg.latency || msg.isOwnerPaused ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     {msg.latency && (
                       <p className="text-xs sm:text-sm text-slate-400">
                         ⏱ {msg.latency.toFixed(3)}s • {msg.model}
                       </p>
+                    )}
+                    {msg.isOwnerPaused && msg.spaceUrl && (
+                      <a
+                        href={msg.spaceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600/80 hover:bg-amber-600 text-white text-xs sm:text-sm font-medium transition-colors"
+                      >
+                        🚀 Reiniciar en Hugging Face
+                      </a>
                     )}
                   </div>
                 ) : null}

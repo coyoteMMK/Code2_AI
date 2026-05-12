@@ -138,11 +138,18 @@ export async function POST(request) {
     });
   } catch (error) {
     const mappedError = normalizeProxyError(error);
+    const errorMessage = String(error?.message ?? error ?? "").toLowerCase();
+    const isOwnerPaused = errorMessage.includes("paused by its owner") || 
+                         errorMessage.includes("space is paused") || 
+                         errorMessage.includes("this space is paused");
 
     return NextResponse.json(
       {
         ok: false,
         error: `${mappedError.error} (reintentos agotados: ${maxAttempts})`,
+        isOwnerPaused,
+        spaceUrl: SPACE_URL,
+        spaceId: SPACE_ID,
         warmup,
       },
       { status: mappedError.status }
