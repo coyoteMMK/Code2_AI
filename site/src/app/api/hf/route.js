@@ -122,7 +122,7 @@ export async function POST(request) {
     temperature,
     topP,
   ];
-  const maxAttempts = warmup ? 3 : 6;
+  const maxAttempts = 1;
 
   const startedAt = Date.now();
 
