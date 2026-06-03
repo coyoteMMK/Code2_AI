@@ -12,6 +12,8 @@ Este repositorio contiene un **pipeline completo** para:
 3. **Evaluar** con métricas estándar (Exact Match, BLEU, ROUGE-L)
 4. **Usar** el modelo a través de una CLI interactiva intuitiva
 
+<img width="1920" height="1440" alt="image" src="https://github.com/user-attachments/assets/5aa00c31-8811-4c8c-aa2c-5fbdbfbc1833" />
+
 ### 🚀 Características principales
 
 - ✅ **Full Fine-Tuning**: Entrenamiento completo del modelo con datos específicos
